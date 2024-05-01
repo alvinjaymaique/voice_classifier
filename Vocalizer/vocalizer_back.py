@@ -116,6 +116,9 @@ class RealTimeAudioAnalyzer:
         self.mapping = {'C':1, 'C#':2, 'D':3, 'D#':4, 'E':5, 'F':6, 'F#':7, 'G':8, 'G#':9, 'A':10, 'A#':11, 'B':12}
         self.musical_note = 'C'
         self.new_note_event = threading.Event()  # Event to signal when a new note is detected
+        self.stream = None
+        self.stop_processing = threading.Event()  # Event to signal processing thread to stop
+        self.processing_thread = None
 
         # Create PyAudio stream
         self.p = pyaudio.PyAudio()
@@ -174,6 +177,8 @@ class RealTimeAudioAnalyzer:
                     self.new_note_event.set()  # Signal that a new note is detected
         except Exception as e:
             print("An error occurred:", e)
+        finally:
+            self.close()
 
     def play_audio_background(self, audio_file):
         def play_audio_task():
@@ -205,7 +210,20 @@ class RealTimeAudioAnalyzer:
             self.close()
 
     def close(self):
+        # Signal the processing thread to stop
+        self.stop_processing.set()
         # Close the PyAudio stream
-        self.stream.stop_stream()
-        self.stream.close()
-        self.p.terminate()
+
+        # self.stream.stop_stream()
+        # self.stream.close()
+        # self.p.terminate()
+
+        if self.stream:
+            self.stream.stop_stream()
+            self.stream.close()
+            self.p.terminate()
+
+        # Wait for the processing thread to finish
+        if self.processing_thread is not None:
+            self.processing_thread.join()
+            
