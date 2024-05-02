@@ -1,0 +1,6 @@
+May 1, 2024:
+    I have to integrate the music_toNote in RealTimeAudioAnalyzer
+    I have to plan and implement how to score the vocalizing of the user
+
+May 3, 2024:
+    In scoring a vocal from user we need to set the time on when the reading will start because the audio file has some introduction from a person
