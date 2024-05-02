@@ -157,12 +157,14 @@ class VoiceClassifier:
         wf.setframerate(self.sample_rate)
         wf.writeframes(b''.join(self.frames))
         wf.close()
+        new_filename = self.output_filename.split('.')[0] + '_' + self.predict_audio(self.output_filename) + '.wav'
+        os.rename(self.output_filename, new_filename)
 
 
-# # Usage example
-# if __name__ == "__main__":
-#     voice_classifier = VoiceClassifier(data_dir='dataset')
-#     # voice_classifier.train_model()
-#     voice_classifier.load_model('model.keras', 'labels.json')
-#     audio_file = 'tenor_pavarotti.wav'
-#     voice_classifier.predict_audio(audio_file)
+# Usage example
+if __name__ == "__main__":
+    voice_classifier = VoiceClassifier(data_dir='dataset')
+    # voice_classifier.train_model()
+    voice_classifier.load_model('model.keras', 'labels.json')
+    audio_file = 'tenor_pavarotti.wav'
+    voice_classifier.predict_audio(audio_file)
