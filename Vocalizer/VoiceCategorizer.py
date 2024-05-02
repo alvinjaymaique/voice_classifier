@@ -141,6 +141,15 @@ class VoiceClassifier:
             self.frames.append(data)
         self.stop_recording()
 
+    def stop_recording(self):
+        if self.recording:
+            self.recording = False
+            print("Finished recording.")
+            self.stream.stop_stream()
+            self.stream.close()
+            self.audio.terminate()
+            self.save_to_file()
+
     def save_to_file(self):
         wf = wave.open(self.output_filename, 'wb')
         wf.setnchannels(self.channels)
@@ -150,10 +159,10 @@ class VoiceClassifier:
         wf.close()
 
 
-# Usage example
-if __name__ == "__main__":
-    voice_classifier = VoiceClassifier(data_dir='dataset')
-    # voice_classifier.train_model()
-    voice_classifier.load_model('model.keras', 'labels.json')
-    audio_file = 'tenor_pavarotti.wav'
-    voice_classifier.predict_audio(audio_file)
+# # Usage example
+# if __name__ == "__main__":
+#     voice_classifier = VoiceClassifier(data_dir='dataset')
+#     # voice_classifier.train_model()
+#     voice_classifier.load_model('model.keras', 'labels.json')
+#     audio_file = 'tenor_pavarotti.wav'
+#     voice_classifier.predict_audio(audio_file)
