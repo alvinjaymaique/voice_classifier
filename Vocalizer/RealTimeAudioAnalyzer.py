@@ -141,7 +141,8 @@
 #     def run(self):
 #         self.audio_analyzer.start_analysis(self.audio_file)
 #         self.finished.emit()
-            
+
+###################################################################################################          
 
 import pyaudio
 import numpy as np
@@ -151,10 +152,11 @@ import threading
 import time
 import pydub
 import csv
+import wave
 from pydub.playback import play
 
 class RealTimeAudioAnalyzer:
-    def __init__(self, buffer_size=4096, channels=1, format=pyaudio.paFloat32, rate=44100):
+    def __init__(self, buffer_size=4096, channels=1, format=pyaudio.paInt16 , rate=44100):
         self.lock = threading.Lock()
         self.buffer_size = buffer_size
         self.channels = channels
@@ -167,7 +169,11 @@ class RealTimeAudioAnalyzer:
         self.stream = None
         self.stop_processing = threading.Event()  # Event to signal processing thread to stop
         self.processing_thread = None
+        self.audio_thread = None
 
+        self.voice_file = ''
+        self.frames = [] # used for recording an audio 
+        self.duration = 0 # duration of recording an audio
         self.user_note = []
         self.isRecord = False # Indicate to record the note to be used for scoring
 
@@ -177,8 +183,12 @@ class RealTimeAudioAnalyzer:
                                   channels=self.channels,
                                   rate=self.rate,
                                   input=True,
-                                  frames_per_buffer=self.buffer_size)
+                                  frames_per_buffer=self.buffer_size)     
+        # self.create_fig()
 
+        
+
+    def create_fig(self):
         # Create a figure for the plot
         self.fig = plt.figure()
         self.ax = self.fig.add_subplot(111)
@@ -191,18 +201,70 @@ class RealTimeAudioAnalyzer:
         
     
     def start_record(self):
-        # self.new_note_event = threading.Event()  # Event to signal when a new note is detected
-        # self.stream = None
-        # self.stop_processing = threading.Event()  # Event to signal processing thread to stop
-        # self.processing_thread = None
+        print("* Recording...")
+        # frames = []  # List to store audio frames
+        # Record audio for 5 seconds (adjust as needed)
+        for _ in range(0, int(self.rate / self.buffer_size * self.duration)):
+            data = self.stream.read(self.buffer_size)
+            self.frames.append(data)
+        print("* Done recording!")
+        self.save_audio()
+    # def start_record(self):
+    #     if self.stream is None:
+    #         self.create_stream()
 
-        # Create PyAudio stream
-        self.p = pyaudio.PyAudio()
-        self.stream = self.p.open(format=self.format,
-                                  channels=self.channels,
-                                  rate=self.rate,
-                                  input=True,
-                                  frames_per_buffer=self.buffer_size)
+    #     print("* Recording...")
+    #     while self.stream.is_active():
+    #         data = self.stream.read(self.buffer_size)
+    #         self.frames.append(data)
+    #     print("* Done recording!")
+    #     self.save_audio()
+
+    # def stop_and_save_recorded_audio(self):
+    #     if self.stream.is_active():
+    #         # Stop recording
+    #         self.stream.stop_stream()
+    #         self.stream.close()
+    #         self.p.terminate()
+            
+    #         # Save the recorded audio to a WAV file
+    #         print("* Done recording!")
+    #         self.save_audio()
+    #     else:
+    #         print("No recording in progress.")
+    def stop_and_save_recorded_audio(self):
+        if self.stream is not None and self.stream.is_active():
+            # Stop recording
+            self.stream.stop_stream()
+            self.stream.close()
+            self.save_audio()
+        if self.audio_thread is not None and self.audio_thread.is_alive():
+            self.stop_processing.set()
+            self.audio_thread.join()
+
+    # def save_audio(self):
+    #     # Close the audio stream
+    #     self.stream.stop_stream()
+    #     self.stream.close()
+    #     self.p.terminate()
+
+    #     # Save the recorded audio to a WAV file
+    #     wf = wave.open(self.voice_file+'.wav', 'wb')
+    #     wf.setnchannels(self.channels)  # Mono
+    #     wf.setsampwidth(self.p.get_sample_size(self.format))
+    #     wf.setframerate(self.rate)  # Sample rate
+    #     wf.writeframes(b''.join(self.frames))
+    #     wf.close()
+    #     print(f"Recording saved as {self.voice_file}.wav")
+    def save_audio(self):
+        wf = wave.open(self.voice_file+'.wav', 'wb')
+        wf.setnchannels(self.channels)  # Mono
+        wf.setsampwidth(self.p.get_sample_size(self.format))
+        wf.setframerate(self.rate)  # Sample rate
+        wf.writeframes(b''.join(self.frames))
+        wf.close()
+        print(f"Recording saved as {self.voice_file}.wav")
+
 
     def get_figure(self):
         return self.fig
@@ -249,7 +311,7 @@ class RealTimeAudioAnalyzer:
         try:
             while not self.stop_processing.is_set():
                 data = self.stream.read(self.buffer_size)
-                samples = np.frombuffer(data, dtype=np.float32)
+                samples = np.frombuffer(data, dtype=np.int16)
 
                 # Process audio and detect pitch using Librosa
                 f0, voiced_flag, _ = librosa.pyin(samples, fmin=librosa.note_to_hz('C0'), fmax=librosa.note_to_hz('C7'))
@@ -280,35 +342,67 @@ class RealTimeAudioAnalyzer:
         def play_audio_task():
             # time.sleep(5)
             audio = pydub.AudioSegment.from_file(audio_file)
-            play(audio)
+            # play(audio)
 
-        audio_thread = threading.Thread(target=play_audio_task)
-        audio_thread.daemon = True  # Set the thread as a daemon so it will be terminated when the main program exits
-        audio_thread.start()
+            # chunk_duration = 1500 # 1 second
+            # # Initialize the starting point of the audio
+            # start_time = 0
+            # # Loop until the entire audio has been played
+            # while start_time < len(audio):
+            #     # Extract the current chunk
+            #     chunk = audio[start_time:start_time + chunk_duration]
+            #     # Play the chunk
+            #     play(chunk)
+            #     # Increment the starting point for the next chunk
+            #     start_time += chunk_duration
 
-    def start_analysis(self, audio_file, sleep):
+            chunk_duration = 2000  # 1 second
+            for start_time in range(0, len(audio), chunk_duration):
+                if self.stop_processing.is_set():  # Check if the stop flag is set
+                    break  # Exit the loop if the flag is set
+                # Extract the current chunk
+                chunk = audio[start_time:start_time + chunk_duration]
+                # Play the chunk
+                play(chunk)
+
+            # # Start the background audio playback thread
+            # self.audio_thread = threading.Thread(target=play_audio_task)
+            # self.audio_thread.daemon = True
+            # self.audio_thread.start()
+               
+        self.audio_thread = threading.Thread(target=play_audio_task)
+        self.audio_thread.daemon = True  # Set the thread as a daemon so it will be terminated when the main program exits
+        self.audio_thread.start()
+        # split_file = audio_file.split('.')
+        # self.start_record(split_file[0]+'1'+split_file[1])
+
+    def start_analysis(self, audio_file, target, sleep, duration):
         # Play the audio in the background
         self.play_audio_background(audio_file)
-
         time.sleep(sleep)
         # Start the real-time processing thread
-        self.processing_thread = threading.Thread(target=self.process_audio)
+        # split_audiofile = audio_file.split('.')
+        self.duration = duration
+        self.voice_file = audio_file.split('.')[0] + '1'
+        # self.start_record()
+        self.processing_thread = threading.Thread(target=target) 
         self.processing_thread.daemon = True
         self.processing_thread.start()
 
-        # # Create a new thread to run the counting function
-        # counting_thread = threading.Thread(target=self.run_counting_thread)
-        # counting_thread.start()
+        # if(target == self.process_audio):
+        #     # Create a new thread to run the counting function
+        #     counting_thread = threading.Thread(target=self.run_counting_thread)
+        #     counting_thread.start()
 
-        try:
-            while not self.stop_processing.is_set():
-                self.new_note_event.wait(0.1)  # Wait for a new note to be detected with a timeout
-                self.update_plot(self.musical_note)  # Update the plot with the new note
-                self.new_note_event.clear()  # Clear the event
-        except KeyboardInterrupt:
-            print("Stopped listening.")
-        finally:
-            self.close()
+        #     try:
+        #         while not self.stop_processing.is_set():
+        #             self.new_note_event.wait(0.1)  # Wait for a new note to be detected with a timeout
+        #             self.update_plot(self.musical_note)  # Update the plot with the new note
+        #             self.new_note_event.clear()  # Clear the event
+        #     except KeyboardInterrupt:
+        #         print("Stopped listening.")
+        #     finally:
+        #         self.close()
 
     # def start_count(self):
     #     for count in range(14):
@@ -320,18 +414,22 @@ class RealTimeAudioAnalyzer:
     #     self.isRecord = self.start_count()
     #     # print("Boolean variable:", boolean_variable)
 
-    def close(self):
-        # Signal the processing thread to stop
-        self.stop_processing.set()
-        # Close the PyAudio stream
-        if self.stream:
-            self.stream.stop_stream()
-            self.stream.close()
-            self.p.terminate()
+    # def close(self):
+    #     # Signal the processing thread to stop
+    #     self.stop_processing.set()
+    #     # Close the PyAudio stream
+    #     if self.stream:
+    #         self.stream.stop_stream()
+    #         self.stream.close()
+    #         self.p.terminate()
 
-        # Wait for the processing thread to finish
-        if self.processing_thread is not None:
-            self.processing_thread.join()
+    #     # Wait for the processing thread to finish
+    #     if self.processing_thread is not None:
+    #         self.processing_thread.join()
+    def close(self):
+        # Close the PyAudio instance
+        if self.p is not None:
+            self.p.terminate()
 
 
     def saveto_csv(self, filename):
