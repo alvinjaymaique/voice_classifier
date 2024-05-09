@@ -1,0 +1,8 @@
+<RCC>
+  <qresource prefix="Pictures">
+    <file>Raw_Image/MainLogo.png</file>
+    <file>Raw_Image/Pause_bttn.png</file>
+    <file>Raw_Image/Play_bttn.png</file>
+    <file>Raw_Image/Stop_bttn.png</file>
+  </qresource>
+</RCC>
