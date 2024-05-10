@@ -6,6 +6,7 @@ from PyQt5 import QtCore, QtWidgets
 from PyQt5.QtCore import QStringListModel, QFileInfo, QDir
 from resources_rc import *
 from Ctgrz_Optn import Ui_Dialog  # Import the QDialog UI form from Ctgrz_Optn.py
+from VoiceCategorizer import VoiceClassifier
 
 class Ctgrz_Optn_Dialog(QDialog, Ui_Dialog):
     def __init__(self, parent=None):
@@ -22,7 +23,7 @@ class MainWindow(QMainWindow):
 
         # Variables
         self.isPauseDisplay = True
-        # self.isDialogOpen = False
+        self.isDialogOpen = False
         self.cv_files = []
         self.cv_model = QStringListModel()  
         self.CV_List.setModel(self.cv_model)
@@ -58,10 +59,15 @@ class MainWindow(QMainWindow):
         # Load files from cv_audio
         self.load_files()
 
+        # For Categorize Option Dialog
         self.ctgrz_optn_dialog = Ctgrz_Optn_Dialog(self)
         self.ctgrz_optn_dialog.close()
         self.ctgrz_optn_dialog.pushButton_2.clicked.connect(self.import_button_clicked)   
         self.ctgrz_optn_dialog.Record_Button.clicked.connect(self.record_button_clicked)
+
+        # Voice Classifier
+        self.voice_classifier = VoiceClassifier()
+        self.voice_classifier.load_model('model.keras', 'labels.json')
 
     def load_files(self):
         directory = QDir('cv_audio')
@@ -109,12 +115,18 @@ class MainWindow(QMainWindow):
             file_path = file_dialog.selectedFiles()[0]
             # print(f"Selected {button_type} file:", file_path)
             file_name = os.path.basename(file_path)
-            destination_path = os.path.join(destination_folder, file_name)
+            category = self.voice_classifier.predict_audio(file_name)
+            array_path =  file_name.split('.')
+            
+            newfile_path = array_path[0]+'-'+category+'.'+array_path[1]
+            destination_path = os.path.join(destination_folder, newfile_path)
+            # destination_path = os.path.join(destination_folder, file_name)
 
             if not os.path.exists(destination_path):
                 shutil.copy(file_path, destination_path)
                 # if button_type == "CV":
-                self.cv_files.append(file_name)
+                self.cv_files.append(newfile_path)
+                # self.cv_files.append(file_name)
                 self.cv_model.setStringList(self.cv_files)
                 if file_path:
                     file_info = QFileInfo(file_path)
