@@ -1,18 +1,24 @@
-import sys, os, shutil
-from PyQt5.QtWidgets import QApplication, QMainWindow, QFileDialog, QToolButton, QPushButton, QDialog, QMessageBox
+import sys, os, shutil, time
+from PyQt5.QtWidgets import QApplication, QMainWindow, QFileDialog, QToolButton, QPushButton, QDialog, QMessageBox, QTextEdit, QListView
 from PyQt5.QtGui import QIcon
 from PyQt5.uic import loadUi
 from PyQt5 import QtCore, QtWidgets
-from PyQt5.QtCore import QStringListModel, QFileInfo, QDir
+from PyQt5.QtCore import QStringListModel, QFileInfo, QDir, QTimer, QItemSelectionModel, QItemSelection
 from resources_rc import *
 from Ctgrz_Optn import Ui_Dialog  # Import the QDialog UI form from Ctgrz_Optn.py
 from VoiceCategorizer import VoiceClassifier
+from RealTimeAudioAnalyzer import RealTimeAudioAnalyzer
+from InputFilename import InputFilename_Dialog
 
 class Ctgrz_Optn_Dialog(QDialog, Ui_Dialog):
     def __init__(self, parent=None):
         super(Ctgrz_Optn_Dialog, self).__init__(parent)
         self.setupUi(self)
 
+class InputFilenameDialog(QDialog, InputFilename_Dialog):
+    def __init__(self, parent=None):
+        super(InputFilenameDialog, self).__init__(parent)
+        self.setupUi(self)
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -27,6 +33,7 @@ class MainWindow(QMainWindow):
         self.cv_files = []
         self.cv_model = QStringListModel()  
         self.CV_List.setModel(self.cv_model)
+        self.isAudioRunning = False
 
 
         self.Tenor_List_2.hide()
@@ -46,15 +53,26 @@ class MainWindow(QMainWindow):
         self.Pause_Start_B.setIconSize(QtCore.QSize(64, 64))  # Adjust the size as needed
         self.Pause_Start_B.clicked.connect(self.pause_start_action)  # Connect the clicked signal to the action
 
-        # # Create an instance of the Ctgrz_Optn dialog
-        # self.dialog = QtWidgets.QDialog()
-        # self.dialog.setParent(MainWindow)
-        # x = (self.pushButton.x()+10)+self.pushButton.width()
-        # self.dialog.move(x, self.pushButton.y())
-        # self.ctgrz_optn_dialog = Ui_Dialog()
-        # self.ctgrz_optn_dialog.setupUi(self.dialog)
-        # self.dialog.exec_()
-        # self.ctgrz_optn_dialog = Ui_Dialog(MainWindow)
+        # Instantiate cv list view
+        self.cv_listview = self.findChild(QListView, 'CV_List')
+        self.cv_listview.selectionModel().selectionChanged.connect(self.onclick_listview)  # Connect selectionChanged signal
+
+        # Set up displayRecord QTextEdit
+        self.display_record = self.findChild(QTextEdit, 'display_record')
+        # self.display_record.setHtml('Test')
+
+        # Stop Button
+        self.btn_stop = self.findChild(QToolButton, "btn_stop")
+        self.btn_stop.clicked.connect(self.stop_btn_clicked)
+
+        self.displayTextList = ['''<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd">
+        <html><head><meta name="qrichtext" content="1" /><style type="text/css">
+        p, li { white-space: pre-wrap; }
+        </style></head><body style=" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;">
+        <p align="center" style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"><span style=" font-size:14pt;">''',
+        '''</span></p></body></html>''']
+        # self.display_record.setMarkdown(self.displayTextList[0]+'Test'+self.displayTextList[1])
+        
 
         # Load files from cv_audio
         self.load_files()
@@ -65,9 +83,16 @@ class MainWindow(QMainWindow):
         self.ctgrz_optn_dialog.pushButton_2.clicked.connect(self.import_button_clicked)   
         self.ctgrz_optn_dialog.Record_Button.clicked.connect(self.record_button_clicked)
 
+        # Input filename in Categorize Voice Record
+        self.input_filename = InputFilenameDialog(self)   
+        self.input_filename.close()
+
         # Voice Classifier
         self.voice_classifier = VoiceClassifier()
         self.voice_classifier.load_model('model.keras', 'labels.json')
+
+        # Real Time Audio Analyzer
+        self.audio_analyzer = RealTimeAudioAnalyzer()
 
     def load_files(self):
         directory = QDir('cv_audio')
@@ -139,8 +164,31 @@ class MainWindow(QMainWindow):
 
     def record_button_clicked(self):
         # Handle record button clicked event
-        pass
+        self.ctgrz_optn_dialog.close()
+        # isEnter = self.input_filename.get_input()
+        # result_ex = self.input_filename.exec_()
+        # print(result_ex)
+        # if result_ex:
+        #     pass    
+        # else:
+        #     print(False)
+        # self.loop(result_ex)
+        self.input_filename.show()
 
+
+    
+    def loop(self, result):
+        if result:
+            for i in range(3,0,-1):
+                    self.display_record.setHtml(self.displayTextList[0]+'Recording in '+str(i)+self.displayTextList[1])
+                    time.sleep(1)   
+                # self.voice_classifier.record_audio('test_audio')
+    
+    def clicked_btn_enter(self):
+        print('Success!')
+        self.input_filename.close()
+        print('Success!')
+            
     def update_cv_list(self, file_path):
         print(f"Selected CV file: {file_path}")
         # Add the selected file path to the CV_List
@@ -165,9 +213,28 @@ class MainWindow(QMainWindow):
             button_center = button_rect.center()
             button.move(sidebar_center.x() - button_center.x(), button.y() + 1)  # Adjust vertical position
 
+    def onclick_listview(self):
+        self.isPauseDisplay = False
+        self.Pause_Start_B.setIcon(QIcon("Raw_Image/Play_bttn.png"))
+
     def pause_start_action(self):
         # Toggle between Pause and Play icons
-
+        try:
+            if not self.isAudioRunning:
+                filename = self.cv_listview.selectedIndexes()[0].data()
+                self.audio_analyzer.play_audio_background('cv_audio\\'+filename)
+                # self.voice_classifier.play_audio('cv_audio\\'+filename)
+            else:
+                pass
+            print(filename)
+        except Exception as e:
+            print(e)
+        # print(self.cv_listview.selectedIndexes()[0])
+        # selected_item = self.cv_files[QItemSelectionModel.currentIndex(self.cv_model)]
+        # if selected_item:
+        #     print(selected_item)
+        # else:
+        #     print('No selected')
         if self.isPauseDisplay:
             print("Set to Play Button")
             self.Pause_Start_B.setIcon(QIcon("Raw_Image/Play_bttn.png"))
@@ -176,14 +243,10 @@ class MainWindow(QMainWindow):
             self.Pause_Start_B.setIcon(QIcon("Raw_Image/Pause_bttn.png"))
         self.isPauseDisplay = not self.isPauseDisplay
 
-        # print(self.Pause_Start_B.icon().name())
-        # if self.Pause_Start_B.icon().isNull() or self.Pause_Start_B.icon().name() == "Raw_Image/Pause_bttn.png":
-        #     print('Set to play')
-        #     self.Pause_Start_B.setIcon(QIcon("Raw_Image/Play_bttn.png"))
-        # else:
-        #     print('Set to pause')
-        #     self.Pause_Start_B.setIcon(QIcon("Raw_Image/Pause_bttn.png"))
-
+    def stop_btn_clicked(self):
+        # print('HEyyy')
+        self.audio_analyzer.stop_audio()
+        
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = MainWindow()

@@ -23,6 +23,7 @@ import pydub
 import csv
 import wave
 from pydub.playback import play
+import pydub.playback
 
 class RealTimeAudioAnalyzer:
     def __init__(self, buffer_size=4096, channels=1, format=pyaudio.paInt16 , rate=44100):
@@ -45,6 +46,7 @@ class RealTimeAudioAnalyzer:
         self.duration = 0 # duration of recording an audio
         self.user_note = []
         self.isRecord = False # Indicate to record the note to be used for scoring
+        self.audio_player = None
 
          # Create PyAudio stream
         self.p = pyaudio.PyAudio()
@@ -145,7 +147,9 @@ class RealTimeAudioAnalyzer:
         def play_audio_task():
             # time.sleep(5)
             audio = pydub.AudioSegment.from_file(audio_file)
-            play(audio)
+            self.audio_player = pydub.playback.play(audio)
+            print(self.audio_player)
+            # play(audio)
             # chunk_duration = 2000  # 1 second
             # for start_time in range(0, len(audio), chunk_duration):
             #     if self.stop_processing.is_set():  # Check if the stop flag is set
@@ -160,6 +164,17 @@ class RealTimeAudioAnalyzer:
         self.audio_thread.start()
         # split_file = audio_file.split('.')
         # self.start_record(split_file[0]+'1'+split_file[1])
+
+    def stop_audio(self):
+        # Check if there is a player object and stop it
+        # print(self.audio_player)
+        if not self.audio_player:
+            self.audio_player.stop()
+        else:
+            print("Audio playback hasn't started yet.")
+        # Optionally, if you want to stop the audio playback thread as well
+        # Set the stop_processing flag if it's used in your threaded task
+        self.stop_processing.set()
 
     def start_analysis(self, audio_file, target, sleep, duration):
         # Play the audio in the background
