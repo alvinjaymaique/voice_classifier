@@ -1,6 +1,6 @@
 import numpy as np
 import tensorflow as tf
-import os
+import os, time
 import librosa
 import json
 from tensorflow.keras import layers, models # type: ignore
@@ -10,6 +10,8 @@ from tensorflow.keras.models import load_model # type: ignore
 import pyaudio
 import wave
 import threading
+import pydub
+from pydub.playback import play
 
 # Just disables the warning, doesn't take advantage of AVX/FMA to run faster
 import os
@@ -102,7 +104,7 @@ class VoiceClassifier:
         predicted_class_index = np.argmax(predictions)
         # Check if predicted class index exists in self.labels
         predicted_class = self.labels[predicted_class_index]
-        print("Predicted class:", predicted_class)
+        # print("Predicted class:", predicted_class)
         return predicted_class
 
     def save_model(self, model_path, labels_path):
@@ -154,6 +156,50 @@ class VoiceClassifier:
             self.audio.terminate()
             self.save_to_file()
 
+    def record_audio(self, output_file, duration=5, sample_rate=44100, chunk_size=1024, format=pyaudio.paInt16, channels=1):
+        # self.loop()
+        audio = pyaudio.PyAudio()
+        stream = audio.open(format=format, channels=channels, rate=sample_rate, input=True, frames_per_buffer=chunk_size)
+        print("Recording...")
+        frames = []
+        for i in range(0, int(sample_rate / chunk_size * duration)):
+            data = stream.read(chunk_size)
+            frames.append(data)
+        print("Recording finished.")
+        stream.stop_stream()
+        stream.close()
+        audio.terminate()
+        wave_file = wave.open(output_file+'.wav', 'wb')
+        wave_file.setnchannels(channels)
+        wave_file.setsampwidth(audio.get_sample_size(format))
+        wave_file.setframerate(sample_rate)
+        wave_file.writeframes(b''.join(frames))
+        wave_file.close()
+        print(f"Audio saved to {output_file}")
+
+    def loop(self):
+        for i in range(3,0,-1):
+                # self.display_record.setHtml(self.displayTextList[0]+'Recording in '+str(i)+self.displayTextList[1])
+                print(i)
+                time.sleep(1)   
+
+    def play_audio(self, filename):
+        # chunk = 1024
+        # wf = wave.open(filename, 'rb')
+        # stream = self.audio.open(format=self.audio.get_format_from_width(wf.getsampwidth()),
+        #                          channels=wf.getnchannels(),
+        #                          rate=wf.getframerate(),
+        #                          output=True)
+        # data = wf.readframes(chunk)
+        # while data:
+        #     stream.write(data)
+        #     data = wf.readframes(chunk)
+        # stream.stop_stream()
+        # stream.close()
+        # wf.close()
+        audio = pydub.AudioSegment.from_file(filename)
+        play(audio)
+
     def save_to_file(self):
         wf = wave.open(self.output_filename, 'wb')
         wf.setnchannels(self.channels)
@@ -161,16 +207,30 @@ class VoiceClassifier:
         wf.setframerate(self.sample_rate)
         wf.writeframes(b''.join(self.frames))
         wf.close()
-        # categorized_voice = self.predict_audio(self.output_filename)
-        # print(categorized_voice)
-        # new_filename = self.output_filename.split('.')[0] + '_' + categorized_voice + '.wav'
+        categorized_voice = self.predict_audio(self.output_filename)
+        print(categorized_voice)
+        new_filename = self.output_filename.split('.')[0] + '_' + categorized_voice + '.wav'
         os.rename(self.output_filename, new_filename)
+        
 
 
-# Usage example
-if __name__ == "__main__":
-    voice_classifier = VoiceClassifier(data_dir='dataset')
-    # voice_classifier.train_model()
-    voice_classifier.load_model('model.keras', 'labels.json')
-    audio_file = 'tenor_pavarotti.wav'
-    voice_classifier.predict_audio(audio_file)
+    # def save_to_file(self):
+    #     wf = wave.open(self.output_filename, 'wb')
+    #     wf.setnchannels(self.channels)
+    #     wf.setsampwidth(self.audio.get_sample_size(self.audio_format))
+    #     wf.setframerate(self.sample_rate)
+    #     wf.writeframes(b''.join(self.frames))
+    #     wf.close()
+    #     categorized_voice = self.predict_audio(self.output_filename)
+    #     print(categorized_voice)
+    #     new_filename = self.output_filename.split('.')[0] + '_' + categorized_voice + '.wav'
+    #     os.rename(self.output_filename, new_filename)
+
+
+# # Usage example
+# if __name__ == "__main__":
+#     voice_classifier = VoiceClassifier(data_dir='dataset')
+#     # voice_classifier.train_model()
+#     voice_classifier.load_model('model.keras', 'labels.json')
+#     audio_file = 'tenor_pavarotti.wav'
+#     voice_classifier.predict_audio(audio_file)

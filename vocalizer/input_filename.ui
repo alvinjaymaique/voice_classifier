@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>input_text_form</class>
+ <widget class="QWidget" name="input_text_form">
+  <property name="windowModality">
+   <enum>Qt::WindowModal</enum>
+  </property>
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>235</width>
+    <height>122</height>
+   </rect>
+  </property>
+  <property name="focusPolicy">
+   <enum>Qt::StrongFocus</enum>
+  </property>
+  <property name="windowTitle">
+   <string>Enter Name</string>
+  </property>
+  <widget class="QPlainTextEdit" name="filename">
+   <property name="geometry">
+    <rect>
+     <x>10</x>
+     <y>50</y>
+     <width>211</width>
+     <height>21</height>
+    </rect>
+   </property>
+   <property name="verticalScrollBarPolicy">
+    <enum>Qt::ScrollBarAlwaysOff</enum>
+   </property>
+   <property name="horizontalScrollBarPolicy">
+    <enum>Qt::ScrollBarAlwaysOff</enum>
+   </property>
+   <property name="plainText">
+    <string/>
+   </property>
+  </widget>
+  <widget class="QLabel" name="label">
+   <property name="geometry">
+    <rect>
+     <x>20</x>
+     <y>20</y>
+     <width>81</width>
+     <height>21</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Enter File Name</string>
+   </property>
+  </widget>
+  <widget class="QPushButton" name="btn_enter">
+   <property name="geometry">
+    <rect>
+     <x>150</x>
+     <y>90</y>
+     <width>75</width>
+     <height>23</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Enter</string>
+   </property>
+  </widget>
+  <widget class="QPushButton" name="btn_cancel">
+   <property name="geometry">
+    <rect>
+     <x>60</x>
+     <y>90</y>
+     <width>75</width>
+     <height>23</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Cancel</string>
+   </property>
+  </widget>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
