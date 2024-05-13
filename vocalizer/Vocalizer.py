@@ -60,6 +60,9 @@ class PlayAudio(QObject):
         self.is_stop = False
         self.pause_event = Event()
 
+    # def __del__(self):
+    #     del self
+
     # def play(self):
     #     from VoiceCategorizer import VoiceClassifier
     #     # For example:
@@ -130,7 +133,11 @@ class PlayAudio(QObject):
         self.pause_event.set()  # Set the event flag to resume playback
 
     def stop(self):
+        print('Stopped')
+        self.finished.emit()
         self.is_stop = True
+        
+        
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -148,6 +155,7 @@ class MainWindow(QMainWindow):
         self.import_audio_dir = 'recordings'
         self.play_audio = None  # Initialize play_audio attribute
         self.thread1 = QThread()  # Create the QThread object once
+        # self.thread1.finished.connect(self.del_thread1)
         # self.thread1.start()  # Start the thread
         self.play_audio = PlayAudio('')
 
@@ -451,26 +459,41 @@ class MainWindow(QMainWindow):
             except:
                 pass
             try:
-                if not self.isAudioRunning or self.thread1.isRunning():
+                if not self.thread1.isRunning():
+                    print('Thread1 is Running: ',not self.thread1.isRunning())
                     filename = self.cv_listview.selectedIndexes()[0].data()
-                    # Define Counter
-                    # self.thread1 = QThread()
+                    # # Define Counter
+                    self.thread1 = QThread()
                     audio_to_play = 'cv_audio\\'+filename
-                    # self.play_audio = PlayAudio(audio_to_play)
-                    self.play_audio.set_filename(audio_to_play)
-                    # self.play_audio.play()
+                    self.play_audio = PlayAudio( audio_to_play)
+                    
+                    # self.play_audio.set_filename(audio_to_play)
                     self.play_audio.moveToThread(self.thread1)
                     self.play_audio.finished.connect(self.thread1.quit)
-                    # self.play_audio.started.connect(self.play_sel_audio)
-                    # self.play_sel_audio.finished.conn
-                    
                     self.start_audio()
-                    # self.startTask()
                     
-                    # self.voice_classifier.play_audio('cv_audio\\'+filename)
+                    # filename = self.cv_listview.selectedIndexes()[0].data()
+                    # audio_to_play = 'cv_audio\\'+filename
+                    # self.play_audio.set_filename(audio_to_play)
+                    # self.play_audio.moveToThread(self.thread1)
+                    # self.play_audio.finished.connect(self.del_play_audio)
+                    # self.play_audio.finished.connect(self.thread1.quit)
+                    # self.start_audio()
+
+                    # if self.cv_listview.selectedIndexes():
+                    #     filename = self.cv_listview.selectedIndexes()[0].data()
+                    #     audio_to_play = 'cv_audio\\' + filename
+                    #     self.play_audio.set_filename(audio_to_play)
+                    #     self.play_audio.moveToThread(self.thread1)
+                    #     # self.play_audio.finished.connect(self.del_play_audio)
+                    #     self.play_audio.finished.connect(self.thread1.quit)
+                    #     self.start_audio()
+                    # else:
+                    #     print('No selected index')
+
                 else:
                     pass
-                print(filename)
+                # print(filename)
             except Exception as e:
                 print(e)
             self.Pause_Start_B.setIcon(QIcon("Raw_Image/Pause_bttn.png"))
@@ -483,15 +506,41 @@ class MainWindow(QMainWindow):
     def play_sel_audio(self, filepath):
         self.audio_analyzer.play_audio_background(filepath)
 
+    # def stop_btn_clicked(self):
+    #     try:
+    #         self.play_audio.disconnect()
+    #         self.play_audio.stop()
+    #         print('play_audio is deleted')
+           
+    #     except:
+    #         pass
+    #     # print('HEyyy')
+    #     # raise SystemExit()
+    #     pass
+    #     # self.audio_analyzer.stop_audio()
+
     def stop_btn_clicked(self):
         try:
+            # Disconnect signals and stop audio playback
+            # self.play_audio.started.disconnect()
+            # self.play_audio.finished.disconnect()
+            # self.play_audio.moveToThread(self.thread1)
             self.play_audio.stop()
-        except:
-            pass
-        # print('HEyyy')
-        # raise SystemExit()
+            self.play_audio.disconnect()
+            
+            
+            # self.play_audio.deleteLater()
+            print('play_audio stopped')
+        except Exception as e:
+            print(e)
+            
+    def del_thread1(self):
+        # self.thread1.deleteLater()
         pass
-        # self.audio_analyzer.stop_audio()
+
+    def del_play_audio(self):
+        # self.play_audio = PlayAudio('')
+        print('Deleted1')
         
 if __name__ == "__main__":
     app = QApplication(sys.argv)
