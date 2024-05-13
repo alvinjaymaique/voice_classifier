@@ -1,6 +1,6 @@
 import numpy as np
 import tensorflow as tf
-import os
+import os, time
 import librosa
 import json
 from tensorflow.keras import layers, models # type: ignore
@@ -157,6 +157,7 @@ class VoiceClassifier:
             self.save_to_file()
 
     def record_audio(self, output_file, duration=5, sample_rate=44100, chunk_size=1024, format=pyaudio.paInt16, channels=1):
+        # self.loop()
         audio = pyaudio.PyAudio()
         stream = audio.open(format=format, channels=channels, rate=sample_rate, input=True, frames_per_buffer=chunk_size)
         print("Recording...")
@@ -175,6 +176,12 @@ class VoiceClassifier:
         wave_file.writeframes(b''.join(frames))
         wave_file.close()
         print(f"Audio saved to {output_file}")
+
+    def loop(self):
+        for i in range(3,0,-1):
+                # self.display_record.setHtml(self.displayTextList[0]+'Recording in '+str(i)+self.displayTextList[1])
+                print(i)
+                time.sleep(1)   
 
     def play_audio(self, filename):
         # chunk = 1024
@@ -220,10 +227,10 @@ class VoiceClassifier:
     #     os.rename(self.output_filename, new_filename)
 
 
-# Usage example
-if __name__ == "__main__":
-    voice_classifier = VoiceClassifier(data_dir='dataset')
-    # voice_classifier.train_model()
-    voice_classifier.load_model('model.keras', 'labels.json')
-    audio_file = 'tenor_pavarotti.wav'
-    voice_classifier.predict_audio(audio_file)
+# # Usage example
+# if __name__ == "__main__":
+#     voice_classifier = VoiceClassifier(data_dir='dataset')
+#     # voice_classifier.train_model()
+#     voice_classifier.load_model('model.keras', 'labels.json')
+#     audio_file = 'tenor_pavarotti.wav'
+#     voice_classifier.predict_audio(audio_file)

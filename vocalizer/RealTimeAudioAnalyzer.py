@@ -22,8 +22,9 @@ import time
 import pydub
 import csv
 import wave
-from pydub.playback import play
 import pydub.playback
+import ctypes
+from pydub.playback import play
 
 class RealTimeAudioAnalyzer:
     def __init__(self, buffer_size=4096, channels=1, format=pyaudio.paInt16 , rate=44100):
@@ -168,10 +169,12 @@ class RealTimeAudioAnalyzer:
     def stop_audio(self):
         # Check if there is a player object and stop it
         # print(self.audio_player)
-        if not self.audio_player:
-            self.audio_player.stop()
-        else:
-            print("Audio playback hasn't started yet.")
+        
+        
+        # if self.audio_player:
+        #     self.audio_player.stop()
+        # else:
+        #     print("Audio playback hasn't started yet.")
         # Optionally, if you want to stop the audio playback thread as well
         # Set the stop_processing flag if it's used in your threaded task
         self.stop_processing.set()

@@ -2,6 +2,9 @@
 <ui version="4.0">
  <class>input_text_form</class>
  <widget class="QWidget" name="input_text_form">
+  <property name="windowModality">
+   <enum>Qt::WindowModal</enum>
+  </property>
   <property name="geometry">
    <rect>
     <x>0</x>

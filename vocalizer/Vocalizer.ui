@@ -652,7 +652,7 @@ color: rgb(226, 226, 226);}</string>
     <widget class="QLabel" name="label">
      <property name="geometry">
       <rect>
-       <x>240</x>
+       <x>260</x>
        <y>70</y>
        <width>251</width>
        <height>231</height>
