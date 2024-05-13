@@ -43,24 +43,94 @@ class Counter(QObject):
         QThread.sleep(6)
         self.finished.emit() # Signal task completion
 
-class RecordWorker(QObject):
+class PlayAudio(QObject):
+    
     started = pyqtSignal()
+    progress = pyqtSignal()
     finished = pyqtSignal()
 
     def __init__(self, filename):
+        from threading import Event
+        import wave, pyaudio
         super().__init__()
         self.filename = filename
+        self.chunk_size = 1024
+        self.pa = pyaudio.PyAudio()
+        self.is_paused = False
+        self.is_stop = False
+        self.pause_event = Event()
 
-    def record_audio(self):
-        from VoiceCategorizer import VoiceClassifier
-        # Long recording process goes here
-        # For example:
-        print(f"Recording audio to {self.filename}")
+    # def play(self):
+    #     from VoiceCategorizer import VoiceClassifier
+    #     # For example:
+    #     self.voice_classifier = VoiceClassifier()
+    #     print(f"Play audio to {self.filename}")
+    #     self.started.emit()
+    #     self.voice_classifier.play_audio(self.filename)
+    #     # Simulate recording for 5 seconds
+    #     print("Play audio finished")
+    #     self.finished.emit()
+
+    def play(self):
+        # self.voice_classifier = VoiceClassifier()
+        print(f"Play audio from {self.filename}")
+        # self.started.emit()
+        # # Start playing audio in a separate thread
+        # self.audio_thread = QThread()
+        # self.audio_thread.started.connect(self._play_audio)
+        # self.audio_thread.start()
+
         self.started.emit()
-        # Simulate recording for 5 seconds
-        
-        print("Recording finished")
+        self.audio_thread = QThread()
+        self.audio_thread.started.connect(self._play_audio)
+        self.moveToThread(self.audio_thread)  # Move object to new thread
+        self.audio_thread.start()
+
+    def _play_audio(self):
+        import wave
+        wf = wave.open(self.filename, 'rb')
+        stream = self.pa.open(format=self.pa.get_format_from_width(wf.getsampwidth()),
+                              channels=wf.getnchannels(),
+                              rate=wf.getframerate(),
+                              output=True)
+        self.is_paused = False  # Start with audio playing
+        data = wf.readframes(self.chunk_size)
+        while data and not self.is_stop:
+            # if self.is_paused:
+            #     print('wait')
+            #     self.pause_event.wait()  # Wait until resume is called
+            #     self.pause_event.clear()  # Clear the event flag
+            # else:
+            #     stream.write(data)
+            #     data = wf.readframes(self.chunk_size)
+            if self.is_paused:
+                print('Paused. Waiting for resume...')
+                self.pause_event.wait()  # Wait until resume is called
+                self.pause_event.clear()  # Clear the event flag
+                print('Resumed.')
+            # print(self.is_paused)
+            stream.write(data)
+            data = wf.readframes(self.chunk_size)
+    
+
+        stream.stop_stream()
+        stream.close()
+        wf.close()
+        print("Audio playback finished")
         self.finished.emit()
+
+    def set_filename(self, filename):
+        self.filename = filename
+
+    def pause(self):
+        self.is_paused = True
+
+    def resume(self):
+        self.is_paused = False
+        self.pause_event.set()  # Set the event flag to resume playback
+
+    def stop(self):
+        self.is_stop = True
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -76,6 +146,10 @@ class MainWindow(QMainWindow):
         self.isAudioRunning = False
         self.cur_path = ''
         self.import_audio_dir = 'recordings'
+        self.play_audio = None  # Initialize play_audio attribute
+        self.thread1 = QThread()  # Create the QThread object once
+        # self.thread1.start()  # Start the thread
+        self.play_audio = PlayAudio('')
 
         self.Tenor_List_2.hide()
         self.Soprano_List_2.hide()
@@ -264,7 +338,7 @@ class MainWindow(QMainWindow):
         # print(result_ex)
         if result_ex:
             pass
-            # Define Worker
+            # Define Counter
             self.thread = QThread()
             self.counter = Counter(self.save_recorded)
             self.counter.moveToThread(self.thread)
@@ -351,16 +425,7 @@ class MainWindow(QMainWindow):
 
     def pause_start_action(self):
         # Toggle between Pause and Play icons
-        try:
-            if not self.isAudioRunning:
-                filename = self.cv_listview.selectedIndexes()[0].data()
-                self.audio_analyzer.play_audio_background('cv_audio\\'+filename)
-                # self.voice_classifier.play_audio('cv_audio\\'+filename)
-            else:
-                pass
-            print(filename)
-        except Exception as e:
-            print(e)
+        
         # print(self.cv_listview.selectedIndexes()[0])
         # selected_item = self.cv_files[QItemSelectionModel.currentIndex(self.cv_model)]
         # if selected_item:
@@ -370,12 +435,59 @@ class MainWindow(QMainWindow):
         if self.isPauseDisplay:
             print("Set to Play Button")
             self.Pause_Start_B.setIcon(QIcon("Raw_Image/Play_bttn.png"))
+            try:
+                print('Paused')
+                self.play_audio.is_paused = True
+                print(self.play_audio.is_paused)
+                self.play_audio.pause()
+            except:
+                pass
         elif not self.isPauseDisplay:
             print("Set to Pause Button")
+            try:
+                print('Resumed')
+                self.play_audio.resume()
+                print(self.play_audio.is_paused)
+            except:
+                pass
+            try:
+                if not self.isAudioRunning or self.thread1.isRunning():
+                    filename = self.cv_listview.selectedIndexes()[0].data()
+                    # Define Counter
+                    # self.thread1 = QThread()
+                    audio_to_play = 'cv_audio\\'+filename
+                    # self.play_audio = PlayAudio(audio_to_play)
+                    self.play_audio.set_filename(audio_to_play)
+                    # self.play_audio.play()
+                    self.play_audio.moveToThread(self.thread1)
+                    self.play_audio.finished.connect(self.thread1.quit)
+                    # self.play_audio.started.connect(self.play_sel_audio)
+                    # self.play_sel_audio.finished.conn
+                    
+                    self.start_audio()
+                    # self.startTask()
+                    
+                    # self.voice_classifier.play_audio('cv_audio\\'+filename)
+                else:
+                    pass
+                print(filename)
+            except Exception as e:
+                print(e)
             self.Pause_Start_B.setIcon(QIcon("Raw_Image/Pause_bttn.png"))
         self.isPauseDisplay = not self.isPauseDisplay
+    
+    def start_audio(self):
+        self.thread1.started.connect(self.play_audio.play)
+        self.thread1.start()
+
+    def play_sel_audio(self, filepath):
+        self.audio_analyzer.play_audio_background(filepath)
 
     def stop_btn_clicked(self):
+        try:
+            self.play_audio.stop()
+        except:
+            pass
         # print('HEyyy')
         # raise SystemExit()
         pass
