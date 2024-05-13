@@ -10,7 +10,7 @@ from VoiceCategorizer import VoiceClassifier
 from RealTimeAudioAnalyzer import RealTimeAudioAnalyzer
 from InputFilename import InputFilename_Dialog
 
-# Make a destructor for killing a thread
+# I can only play an audio once, fix this next time
 
 class Ctgrz_Optn_Dialog(QDialog, Ui_Dialog):
     def __init__(self, parent=None):
