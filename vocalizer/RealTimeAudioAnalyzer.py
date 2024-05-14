@@ -159,7 +159,7 @@ class RealTimeAudioAnalyzer:
             #     chunk = audio[start_time:start_time + chunk_duration]
             #     # Play the chunk
             #     play(chunk)
-               
+        # play_audio_task()
         self.audio_thread = threading.Thread(target=play_audio_task)
         self.audio_thread.daemon = True  # Set the thread as a daemon so it will be terminated when the main program exits
         self.audio_thread.start()
@@ -179,7 +179,7 @@ class RealTimeAudioAnalyzer:
         # Set the stop_processing flag if it's used in your threaded task
         self.stop_processing.set()
 
-    def start_analysis(self, audio_file, target, sleep, duration):
+    def start_analysis(self, audio_file, sleep, duration):
         # Play the audio in the background
         self.play_audio_background(audio_file)
         time.sleep(sleep)
@@ -188,9 +188,9 @@ class RealTimeAudioAnalyzer:
         self.duration = duration
         self.voice_file = audio_file.split('.')[0] + '1'
         # self.start_record()
-        self.processing_thread = threading.Thread(target=target) 
-        self.processing_thread.daemon = True
-        self.processing_thread.start()
+        # self.processing_thread = threading.Thread(target=target) 
+        # self.processing_thread.daemon = True
+        # self.processing_thread.start()
 
     def close(self):
         # Close the PyAudio instance

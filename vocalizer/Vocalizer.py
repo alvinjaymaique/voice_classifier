@@ -1,5 +1,5 @@
-import sys, os, shutil, time, ctypes, threading
-from PyQt5.QtWidgets import QApplication, QMainWindow, QFileDialog, QToolButton, QPushButton, QDialog, QMessageBox, QTextEdit, QListView, QVBoxLayout
+import sys, os, shutil, time, ctypes, threading, json
+from PyQt5.QtWidgets import QApplication, QMainWindow, QFileDialog, QToolButton, QPushButton, QDialog, QMessageBox, QTextEdit, QListView, QVBoxLayout, QWidget
 from PyQt5.QtGui import QIcon
 from PyQt5.uic import loadUi
 from PyQt5 import QtCore, QtWidgets
@@ -46,13 +46,14 @@ class Counter(QObject):
     progress = pyqtSignal(int)
     start_record = pyqtSignal()
 
-    def __init__(self, function):
+    def __init__(self, function, seconds=3):
         super().__init__()
         self.function = function
+        self.seconds = seconds
         self.destroyed.connect(self.function) # When the instance of this class is destroyed it will call this function
 
     def count_down(self):
-        for i in range(3, 0, -1):
+        for i in range(self.seconds, 0, -1):
             self.progress.emit(i) # Emit progress
             QThread.sleep(1)
         self.start_record.emit()
@@ -125,6 +126,15 @@ class PlayAudio(QObject):
         self.finished.emit()
         self.is_stop = True       
 
+
+# class QListView(QListView):
+#     def focusOutEvent(self, event):
+#         # Call the base class method to ensure the default behavior is executed
+#         super().focusOutEvent(event)
+        
+#         # Your custom handling code here
+#         print("ListView lost focus")
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -144,8 +154,17 @@ class MainWindow(QMainWindow):
         self.play_audio = PlayAudio('')
         self.prev_selected_file = ''
         self.isMale = None
+        self.tv_selected_dir = ''
+        self.tv_selected_item = ''
+        # list of seconds for vocal warmups
+        self.list_seconds = []
+        self.path_for_seconds = ''
 
-        # For training 
+
+        # # QMain bar setup
+        # self.mainbar = self.findChild(QWidget, 'MainBar')
+
+        # For training setup
         self.tenor_list = self.findChild(QListView, 'Tenor_List_2')
         self.soprano_list = self.findChild(QListView, 'Soprano_List_2')
         self.bass_list = self.findChild(QListView, 'Bass_List_2')
@@ -167,11 +186,18 @@ class MainWindow(QMainWindow):
         self.alto_model = QStringListModel()  
         self.alto_list.setModel(self.alto_model)
 
+        self.categories = [self.alto_list, self.bass_list, self.tenor_list, self.soprano_list]
+        for category in self.categories:
+            # category.selectionModel().selectionChanged.connect(self.category_listview)
+            category.clicked.connect(self.category_listview)
+            # category.focusOutEvent()
 
         self.Tenor_List_2.hide()
         self.Soprano_List_2.hide()
         self.Bass_List_2.hide()
         self.Alto_List_2.hide()
+        #
+
 
         # Connect button toggled signal to adjust button positions
         self.Tenor_Bttn.toggled.connect(self.adjust_button_positions)
@@ -183,22 +209,25 @@ class MainWindow(QMainWindow):
         self.cv_btn = self.findChild(QPushButton, 'CV_Button')
         self.cv_btn.clicked.connect(self.open_tv_button_dialog)   
         self.cv_btn.clicked.connect(self.adjust_button_positions)
+        self.cv_btn.clicked.connect(self.clear_list_clicked)
 
         self.tv_btn = self.findChild(QPushButton, 'TV_Button')
         self.tv_btn.clicked.connect(self.adjust_button_positions)
+        self.tv_btn.clicked.connect(self.clear_list_clicked)
 
         # Setup vertical layout
         self.v_layout = self.findChild(QVBoxLayout, 'verticalLayout')
 
         # Set up Pause_Start_B button
-        self.Pause_Start_B = self.findChild(QToolButton, "Pause_Start_B")
-        self.Pause_Start_B.setIcon(QIcon("Raw_Image/Pause_bttn.png"))  # Set the path to the pause icon
-        self.Pause_Start_B.setIconSize(QtCore.QSize(64, 64))  # Adjust the size as needed
-        self.Pause_Start_B.clicked.connect(self.pause_start_action)  # Connect the clicked signal to the action
+        self.btn_pause_start = self.findChild(QToolButton, "Pause_Start_B")
+        self.btn_pause_start.setIcon(QIcon("Raw_Image/Pause_bttn.png"))  # Set the path to the pause icon
+        self.btn_pause_start.setIconSize(QtCore.QSize(64, 64))  # Adjust the size as needed
+        self.btn_pause_start.clicked.connect(self.pause_start_action)  # Connect the clicked signal to the action
 
         # Instantiate cv list view
         self.cv_listview = self.findChild(QListView, 'CV_List')
         self.cv_listview.selectionModel().selectionChanged.connect(self.onclick_listview)  # Connect selectionChanged signal
+        
 
         # Set up displayRecord QTextEdit
         self.display_record = self.findChild(QTextEdit, 'display_record')
@@ -207,6 +236,12 @@ class MainWindow(QMainWindow):
         # Stop Button
         self.btn_stop = self.findChild(QToolButton, "btn_stop")
         self.btn_stop.clicked.connect(self.stop_btn_clicked)
+
+        # Practice Button Setup
+        self.btn_practice = self.findChild(QPushButton, 'btn_practice')
+        self.btn_practice.clicked.connect(self.practice_clicked)
+        self.btn_practice.setEnabled(False)
+        self.btn_practice.setVisible(False)
 
         self.displayTextList = ['''<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd">
         <html><head><meta name="qrichtext" content="1" /><style type="text/css">
@@ -249,6 +284,19 @@ class MainWindow(QMainWindow):
             os.makedirs('cv_audio')
         if not os.path.exists(self.import_audio_dir):
             os.makedirs(self.import_audio_dir)
+        if not os.path.exists('recordings'):
+            os.makedirs('recordings')
+        if not os.path.exists('train_audio'):
+            os.makedirs('train_audio')    
+        categories = ['bass', 'tenor', 'alto', 'soprano']
+        for category in categories:
+            path = 'train_audio\\'+category
+            if not os.path.exists(path):
+                os.makedirs(path) 
+            if not os.path.exists(path+'\\audio'):
+                os.makedirs(path+'\\audio')
+            if not os.path.exists(path+'\\csv'):
+                os.makedirs(path+'\\csv')
 
 
     def load_files(self):
@@ -267,7 +315,7 @@ class MainWindow(QMainWindow):
         self.load_train_files(self.soprano_files, self.soprano_model, dir='soprano')
 
     def load_train_files(self, files, model,  dir='bass',):
-        dir='train_audio\\'+dir
+        dir='train_audio\\'+dir+'\\audio'
         directory = QDir(dir)
         file_list = directory.entryList()
         file_list = [file for file in file_list if file not in ['.','..']]
@@ -276,6 +324,43 @@ class MainWindow(QMainWindow):
             print(file_name)
         model.setStringList(files)
 
+    def category_listview(self):
+        sender = self.sender()  # Get the sender object (the list view that emitted the signal)
+        selected_item = sender.selectedIndexes()[0].data()
+        # self.index_for_list_sec = 
+        directories = QDir('train_audio')
+        for directory in directories:
+            if directory in selected_item:
+                self.tv_selected_dir = directory
+                if selected_item.startswith(directory):
+                    self.index_for_list_sec = selected_item[len(directory):].split('.')[0]  # Remove the prefix string1 from string2
+                    print(self.index_for_list_sec)
+                print(directory)
+        
+        # self.alto_list.selectedIndexes()[0].data()
+        self.path_for_seconds = 'train_audio\\'+self.tv_selected_dir+'\\seconds.json'
+        self.tv_selected_item = 'train_audio\\'+self.tv_selected_dir+'\\audio\\'+selected_item
+        if sender == self.alto_list:
+            # Do something for the alto_list
+            print("Alto list view clicked")
+        elif sender == self.bass_list:
+            # Do something for the bass_list
+            print("Bass list view clicked")
+        elif sender == self.tenor_list:
+            # Do something for the tenor_list
+            print("Tenor list view clicked")
+        elif sender == self.soprano_list:
+            # Do something for the soprano_list
+            print("Soprano list view clicked")
+        print(self.tv_selected_item)
+        self.btn_practice.setEnabled(True)
+        self.btn_practice.setVisible(True)
+
+    def clear_list_clicked(self):
+        self.cv_listview.selectionModel().clearSelection()
+        for category in self.categories:
+            category.selectionModel().clearSelection()
+        
     def open_tv_button_dialog(self):
         self.openFileDialog("TV")
 
@@ -409,13 +494,19 @@ class MainWindow(QMainWindow):
         # Indicate that the program is recording
         self.display_record.setHtml(self.displayTextList[0]+'Recording...'+self.displayTextList[1])
 
-    def record_cv(self):
-        # Recording the voice
-        self.cur_path = self.import_audio_dir+'\\'+self.input_filename.name
-        # self.cur_path = self.input_filename.name
-        self.record_thread = threading.Thread(target=self.voice_classifier.record_audio, args=(self.cur_path, 60))
-        self.record_thread.setDaemon = True
-        self.record_thread.start()
+    def record_cv(self, isCV = True):
+        if isCV:
+            # Recording the voice
+            self.cur_path = self.import_audio_dir+'\\'+self.input_filename.name
+            # self.cur_path = self.input_filename.name
+            self.btn_pause_start.setEnabled(False)
+            self.btn_stop.setEnabled(False)
+            self.record_thread = threading.Thread(target=self.voice_classifier.record_audio, args=(self.cur_path, 60))
+            self.record_thread.setDaemon = True
+            self.record_thread.start()
+        else:
+            print('isCV is False')
+            pass
 
     # def record_tv(self):
     #     pass
@@ -424,6 +515,8 @@ class MainWindow(QMainWindow):
     def done_recording(self):
         self.display_record.setHtml(self.displayTextList[0]+'Recording Saved'+self.displayTextList[1])  
         print('Done Recording')
+        self.btn_pause_start.setEnabled(True)
+        self.btn_stop.setEnabled(True)
         # self.save_recorded()
        
     def save_recorded(self):
@@ -463,7 +556,9 @@ class MainWindow(QMainWindow):
 
     def onclick_listview(self):
         self.isPauseDisplay = False
-        self.Pause_Start_B.setIcon(QIcon("Raw_Image/Play_bttn.png"))
+        self.btn_practice.setEnabled(False)
+        self.btn_practice.setVisible(False)
+        self.btn_pause_start.setIcon(QIcon("Raw_Image/Play_bttn.png"))
 
     def pause_start_action(self):
         # Toggle between Pause and Play icons
@@ -510,9 +605,9 @@ class MainWindow(QMainWindow):
 
     def change_pause_start_dis(self):
         if self.isPauseDisplay:
-            self.Pause_Start_B.setIcon(QIcon("Raw_Image/Play_bttn.png"))
+            self.btn_pause_start.setIcon(QIcon("Raw_Image/Play_bttn.png"))
         else:
-            self.Pause_Start_B.setIcon(QIcon("Raw_Image/Pause_bttn.png"))
+            self.btn_pause_start.setIcon(QIcon("Raw_Image/Pause_bttn.png"))
         self.isPauseDisplay = not self.isPauseDisplay
     
     
@@ -528,6 +623,39 @@ class MainWindow(QMainWindow):
             print('play_audio stopped')
         except Exception as e:
             print(e)
+
+    def practice_clicked(self):
+        print('Start Practice')
+         # Handle record button clicked event   
+        self.btn_practice.setVisible(False)
+        self.cur_path = 'temp\\1'
+        index = int(self.index_for_list_sec)
+        self.list_seconds = self.read_json(self.path_for_seconds)
+        seconds = self.list_seconds[index]
+        # Define Counter
+        self.thread = QThread()
+        self.counter = Counter(self.save_recorded, seconds=seconds)
+        self.counter.moveToThread(self.thread)
+        self.counter.finished.connect(self.thread.quit)
+        self.counter.progress.connect(self.counting)
+        self.counter.start_record.connect(self.done_counting) 
+        self.counter.start_record.connect(lambda: self.record_cv(isCV=False))
+        self.counter.finished.connect(self.done_counting) 
+        self.counter.finished.connect(self.done_recording)
+        # self.counter.deleteLater()
+        self.start_task()
+        path = self.tv_selected_item
+        self.audio_analyzer.play_audio_background(path)
+
+    def write_json(self, data, filepath):
+        with open(filepath, 'w') as f:
+            json.dump(data, f)
+
+    def read_json(self, filepath):
+        # Open the file and read the list from JSON
+        with open(filepath, 'r') as f:
+            recovered_data = json.load(f)
+        return recovered_data
         
 if __name__ == "__main__":
     app = QApplication(sys.argv)
