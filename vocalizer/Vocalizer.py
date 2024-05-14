@@ -145,6 +145,29 @@ class MainWindow(QMainWindow):
         self.prev_selected_file = ''
         self.isMale = None
 
+        # For training 
+        self.tenor_list = self.findChild(QListView, 'Tenor_List_2')
+        self.soprano_list = self.findChild(QListView, 'Soprano_List_2')
+        self.bass_list = self.findChild(QListView, 'Bass_List_2')
+        self.alto_list = self.findChild(QListView, 'Alto_List_2')
+
+        self.tenor_files = []
+        self.tenor_model = QStringListModel()  
+        self.tenor_list.setModel(self.tenor_model)
+
+        self.soprano_files = []
+        self.soprano_model = QStringListModel()  
+        self.soprano_list.setModel(self.soprano_model)
+
+        self.bass_files = []
+        self.bass_model = QStringListModel()  
+        self.bass_list.setModel(self.bass_model)
+
+        self.alto_files = []
+        self.alto_model = QStringListModel()  
+        self.alto_list.setModel(self.alto_model)
+
+
         self.Tenor_List_2.hide()
         self.Soprano_List_2.hide()
         self.Bass_List_2.hide()
@@ -235,6 +258,23 @@ class MainWindow(QMainWindow):
         for file_name in file_list:
             self.cv_files.append(file_name)
         self.cv_model.setStringList(self.cv_files)
+        
+        # Just call here for the train voice
+        print(directory.entryList())
+        self.load_train_files(self.bass_files, self.bass_model)
+        self.load_train_files(self.tenor_files, self.tenor_model, dir='tenor')
+        self.load_train_files(self.alto_files, self.alto_model, dir='alto')
+        self.load_train_files(self.soprano_files, self.soprano_model, dir='soprano')
+
+    def load_train_files(self, files, model,  dir='bass',):
+        dir='train_audio\\'+dir
+        directory = QDir(dir)
+        file_list = directory.entryList()
+        file_list = [file for file in file_list if file not in ['.','..']]
+        for file_name in file_list:
+            files.append(file_name)
+            print(file_name)
+        model.setStringList(files)
 
     def open_tv_button_dialog(self):
         self.openFileDialog("TV")
@@ -317,16 +357,8 @@ class MainWindow(QMainWindow):
         # self.loop(1)
         self.input_filename = InputFilenameDialog(self)  
         self.center_dialog(self.input_filename)
-        # self.input_filename.reject()
 
-        # self.input_filename.accepted.connect(self.create_gender_dialog)
-        # self.input_gender = InputGenderDialog(parent=self)
-        # self.center_dialog(self.input_gender)
-
-        # isEnter = self.input_filename.get_input()
         result_ex = self.input_filename.exec_()
-        # del self.input_filename
-        # print(result_ex)
         if result_ex:
             pass
             # Define Counter
@@ -341,9 +373,6 @@ class MainWindow(QMainWindow):
             self.counter.finished.connect(self.done_recording)
             # self.counter.deleteLater()
             self.start_task()
-
-            # Delete Counter object after a delay (e.g., 1 second)
-            # QTimer.singleShot(7000, self.counter.deleteLater)
             print(self.input_filename.name)
         else:
             print(False)       
@@ -384,9 +413,13 @@ class MainWindow(QMainWindow):
         # Recording the voice
         self.cur_path = self.import_audio_dir+'\\'+self.input_filename.name
         # self.cur_path = self.input_filename.name
-        self.record_thread = threading.Thread(target=self.voice_classifier.record_audio, args=(self.cur_path,))
+        self.record_thread = threading.Thread(target=self.voice_classifier.record_audio, args=(self.cur_path, 60))
         self.record_thread.setDaemon = True
         self.record_thread.start()
+
+    # def record_tv(self):
+    #     pass
+
 
     def done_recording(self):
         self.display_record.setHtml(self.displayTextList[0]+'Recording Saved'+self.displayTextList[1])  
