@@ -9,6 +9,7 @@ from Ctgrz_Optn import Ui_Dialog  # Import the QDialog UI form from Ctgrz_Optn.p
 from VoiceCategorizer import VoiceClassifier
 from RealTimeAudioAnalyzer import RealTimeAudioAnalyzer
 from InputFilename import InputFilename_Dialog
+from input_gender import Ui_input_gender_form
 
 # I can only play an audio once, fix this next time
 
@@ -24,6 +25,21 @@ class InputFilenameDialog(QDialog, InputFilename_Dialog):
 
     def __del__(self):
         print('Input file name dialog deleted.')
+
+class InputGenderDialog(QDialog, Ui_input_gender_form):
+    # def __init__(self, parent=None):
+    #     super(Ui_input_gender_form, self).__init__(parent)
+    #     self.setupUi(self)
+
+    def __init__(self, parent=None):
+        QDialog.__init__(self, parent)  # Call QDialog's __init__ method explicitly
+        Ui_input_gender_form.__init__(self)  # Call Ui_input_gender_form's __init__ method explicitly
+        self.setupUi(self)
+
+    def __del__(self):
+        print('Input gender dialog deleted.')
+
+       
 
 class Counter(QObject):
     finished = pyqtSignal()
@@ -127,6 +143,7 @@ class MainWindow(QMainWindow):
         self.thread1 = QThread()  # Create the QThread object once
         self.play_audio = PlayAudio('')
         self.prev_selected_file = ''
+        self.isMale = None
 
         self.Tenor_List_2.hide()
         self.Soprano_List_2.hide()
@@ -263,8 +280,8 @@ class MainWindow(QMainWindow):
             
             # Copy file
             shutil.copy(file_path, os.curdir)
-
-            newfile_path = self.predict_audio(file_name)
+            gender = self.create_gender_dialog() # 0=Male 1=Female
+            newfile_path = self.predict_audio(file_name, gender)
             # # destination_path = os.path.join(destination_folder, file_name)
             destination_path = os.path.join(destination_folder, newfile_path)
 
@@ -280,8 +297,16 @@ class MainWindow(QMainWindow):
         self.cv_files.append(path)
         self.cv_model.setStringList(self.cv_files)
 
-    def predict_audio(self, filename):
+    def predict_audio(self, filename, gender):
+        # 0=male 1=female
         category = self.voice_classifier.predict_audio(filename)
+        # Increase accuracy since dataset is few
+        if gender==0 and (category=='alto' or category=='soprano'):
+            category = 'tenor'
+        elif gender==1 and (category=='bass' or category=='tenor'):
+            category = 'alto'
+        else:
+            pass
         array_path =  filename.split('.')
         newfile_path = array_path[0]+'-'+category+'.'+array_path[1]
         return newfile_path
@@ -291,12 +316,13 @@ class MainWindow(QMainWindow):
         self.ctgrz_optn_dialog.close()
         # self.loop(1)
         self.input_filename = InputFilenameDialog(self)  
-        x = self.width()/2
-        y = self.height()/2
-        w = self.input_filename.width()
-        h = self.input_filename.height()
-        self.input_filename.setStyleSheet("background-color: white;")
-        self.input_filename.setGeometry(x, y, w, h)
+        self.center_dialog(self.input_filename)
+        # self.input_filename.reject()
+
+        # self.input_filename.accepted.connect(self.create_gender_dialog)
+        # self.input_gender = InputGenderDialog(parent=self)
+        # self.center_dialog(self.input_gender)
+
         # isEnter = self.input_filename.get_input()
         result_ex = self.input_filename.exec_()
         # del self.input_filename
@@ -314,7 +340,7 @@ class MainWindow(QMainWindow):
             self.counter.finished.connect(self.done_counting) 
             self.counter.finished.connect(self.done_recording)
             # self.counter.deleteLater()
-            self.startTask()
+            self.start_task()
 
             # Delete Counter object after a delay (e.g., 1 second)
             # QTimer.singleShot(7000, self.counter.deleteLater)
@@ -323,7 +349,26 @@ class MainWindow(QMainWindow):
             print(False)       
         # self.input_filename.show() 
 
-    def startTask(self):
+    def create_gender_dialog(self):
+        self.input_gender = InputGenderDialog(self)
+        self.center_dialog(self.input_gender)
+        self.btn_male = self.input_gender.findChild(QPushButton, 'btn_male')
+        self.btn_female = self.input_gender.findChild(QPushButton, 'btn_female')
+        self.btn_female.clicked.connect(self.input_gender.accept)
+        self.btn_male.clicked.connect(self.input_gender.reject)
+        return self.input_gender.exec_()
+
+    def center_dialog(self, dialog):
+        if isinstance(dialog, QDialog):
+            x = self.width()/2
+            y = self.height()/2
+            w = dialog.width()
+            h = dialog.height()
+            dialog.setStyleSheet("background-color: white;")
+            dialog.setGeometry(x, y, w, h)
+        pass
+
+    def start_task(self):
         self.thread.started.connect(self.counter.count_down)
         self.thread.start()
 
