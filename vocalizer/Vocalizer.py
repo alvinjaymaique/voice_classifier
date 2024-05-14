@@ -40,7 +40,7 @@ class Counter(QObject):
             self.progress.emit(i) # Emit progress
             QThread.sleep(1)
         self.start_record.emit()
-        QThread.sleep(6)
+        QThread.sleep(61)
         self.finished.emit() # Signal task completion
 
 class PlayAudio(QObject):
@@ -60,29 +60,8 @@ class PlayAudio(QObject):
         self.is_stop = False
         self.pause_event = Event()
 
-    # def __del__(self):
-    #     del self
-
-    # def play(self):
-    #     from VoiceCategorizer import VoiceClassifier
-    #     # For example:
-    #     self.voice_classifier = VoiceClassifier()
-    #     print(f"Play audio to {self.filename}")
-    #     self.started.emit()
-    #     self.voice_classifier.play_audio(self.filename)
-    #     # Simulate recording for 5 seconds
-    #     print("Play audio finished")
-    #     self.finished.emit()
-
     def play(self):
-        # self.voice_classifier = VoiceClassifier()
         print(f"Play audio from {self.filename}")
-        # self.started.emit()
-        # # Start playing audio in a separate thread
-        # self.audio_thread = QThread()
-        # self.audio_thread.started.connect(self._play_audio)
-        # self.audio_thread.start()
-
         self.started.emit()
         self.audio_thread = QThread()
         self.audio_thread.started.connect(self._play_audio)
@@ -99,22 +78,13 @@ class PlayAudio(QObject):
         self.is_paused = False  # Start with audio playing
         data = wf.readframes(self.chunk_size)
         while data and not self.is_stop:
-            # if self.is_paused:
-            #     print('wait')
-            #     self.pause_event.wait()  # Wait until resume is called
-            #     self.pause_event.clear()  # Clear the event flag
-            # else:
-            #     stream.write(data)
-            #     data = wf.readframes(self.chunk_size)
             if self.is_paused:
                 print('Paused. Waiting for resume...')
                 self.pause_event.wait()  # Wait until resume is called
                 self.pause_event.clear()  # Clear the event flag
                 print('Resumed.')
-            # print(self.is_paused)
             stream.write(data)
             data = wf.readframes(self.chunk_size)
-    
 
         stream.stop_stream()
         stream.close()
@@ -126,18 +96,18 @@ class PlayAudio(QObject):
         self.filename = filename
 
     def pause(self):
+        print('Paused')
         self.is_paused = True
 
     def resume(self):
+        print('Resumed')
         self.is_paused = False
         self.pause_event.set()  # Set the event flag to resume playback
 
     def stop(self):
         print('Stopped')
         self.finished.emit()
-        self.is_stop = True
-        
-        
+        self.is_stop = True       
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -155,9 +125,8 @@ class MainWindow(QMainWindow):
         self.import_audio_dir = 'recordings'
         self.play_audio = None  # Initialize play_audio attribute
         self.thread1 = QThread()  # Create the QThread object once
-        # self.thread1.finished.connect(self.del_thread1)
-        # self.thread1.start()  # Start the thread
         self.play_audio = PlayAudio('')
+        self.prev_selected_file = ''
 
         self.Tenor_List_2.hide()
         self.Soprano_List_2.hide()
@@ -172,9 +141,11 @@ class MainWindow(QMainWindow):
 
         # Setup categorize button 
         self.cv_btn = self.findChild(QPushButton, 'CV_Button')
-        self.cv_btn.clicked.connect(self.open_tv_button_dialog)
-        # self.TV_Button.clicked.connect(self.open_tv_button_dialog)
-        # self.CV_Button.clicked.connect(self.open_tv_button_dialog)    
+        self.cv_btn.clicked.connect(self.open_tv_button_dialog)   
+        self.cv_btn.clicked.connect(self.adjust_button_positions)
+
+        self.tv_btn = self.findChild(QPushButton, 'TV_Button')
+        self.tv_btn.clicked.connect(self.adjust_button_positions)
 
         # Setup vertical layout
         self.v_layout = self.findChild(QVBoxLayout, 'verticalLayout')
@@ -215,16 +186,11 @@ class MainWindow(QMainWindow):
         self.ctgrz_optn_dialog.pushButton_2.clicked.connect(self.import_button_clicked)   
         self.ctgrz_optn_dialog.Record_Button.clicked.connect(self.record_button_clicked)
         # Set its x and y coordinates
-        # x = self.cv_btn.x() + self.cv_btn.width() + 100
         x = self.cv_btn.width() + self.cv_listview.width() - 50
         y = self.cv_btn.height() + self.cv_listview.height()
         h = self.ctgrz_optn_dialog.height()
         w = self.ctgrz_optn_dialog.width()
         self.ctgrz_optn_dialog.setGeometry(x, y, h, w)
-
-        # # Input filename in Categorize Voice Record
-        # self.input_filename = InputFilenameDialog(self)   
-        # self.input_filename.close()
 
         # Voice Classifier
         self.voice_classifier = VoiceClassifier()
@@ -232,14 +198,6 @@ class MainWindow(QMainWindow):
 
         # Real Time Audio Analyzer
         self.audio_analyzer = RealTimeAudioAnalyzer()
-
-        # # Define Worker
-        # self.thread = QThread()
-        # self.worker = Worker()
-        # self.worker.moveToThread(self.thread)
-        # self.worker.finished.connect(self.thread.quit)
-        # self.worker.progress.connect(self.updateUI)
-        # self.worker.finished.connect(self.taskFinished)
         
         # Check directories if it exists
         self.check_dir()
@@ -321,7 +279,6 @@ class MainWindow(QMainWindow):
     def cv_add_list(self, path):
         self.cv_files.append(path)
         self.cv_model.setStringList(self.cv_files)
-        pass
 
     def predict_audio(self, filename):
         category = self.voice_classifier.predict_audio(filename)
@@ -417,7 +374,6 @@ class MainWindow(QMainWindow):
     def adjust_button_positions(self):
         # Find all the QPushButtons within the SideBar
         buttons = self.SideBar.findChildren(QPushButton)
-        
         # Calculate the center position of the SideBar widget
         sidebar_center = self.SideBar.rect().center()
 
@@ -425,7 +381,7 @@ class MainWindow(QMainWindow):
             # Adjust the button position to be centered horizontally within the SideBar
             button_rect = button.rect()
             button_center = button_rect.center()
-            button.move(sidebar_center.x() - button_center.x(), button.y() + 1)  # Adjust vertical position
+            button.move(sidebar_center.x() - button_center.x(), button.y())  # Adjust vertical position
 
     def onclick_listview(self):
         self.isPauseDisplay = False
@@ -433,114 +389,67 @@ class MainWindow(QMainWindow):
 
     def pause_start_action(self):
         # Toggle between Pause and Play icons
-        
-        # print(self.cv_listview.selectedIndexes()[0])
-        # selected_item = self.cv_files[QItemSelectionModel.currentIndex(self.cv_model)]
-        # if selected_item:
-        #     print(selected_item)
-        # else:
-        #     print('No selected')
         if self.isPauseDisplay:
             print("Set to Play Button")
-            self.Pause_Start_B.setIcon(QIcon("Raw_Image/Play_bttn.png"))
+            self.change_pause_start_dis()
             try:
-                print('Paused')
                 self.play_audio.is_paused = True
-                print(self.play_audio.is_paused)
                 self.play_audio.pause()
             except:
                 pass
         elif not self.isPauseDisplay:
             print("Set to Pause Button")
             try:
-                print('Resumed')
                 self.play_audio.resume()
-                print(self.play_audio.is_paused)
             except:
                 pass
             try:
-                if not self.thread1.isRunning():
-                    print('Thread1 is Running: ',not self.thread1.isRunning())
-                    filename = self.cv_listview.selectedIndexes()[0].data()
-                    # # Define Counter
+                cur_filename = self.cv_listview.selectedIndexes()[0].data()
+                is_different_file = (self.prev_selected_file != cur_filename)
+                print('The file is different: ',is_different_file)
+                if not self.thread1.isRunning() or is_different_file:
+
+                    # Terminate the thread1 if it is running
+                    if self.thread1.isRunning():
+                        self.thread1.terminate()
+
+                    self.prev_selected_file = cur_filename
+                    print(self.prev_selected_file)
+
+                    # Define new thread and self.play_audio worker
                     self.thread1 = QThread()
-                    audio_to_play = 'cv_audio\\'+filename
+                    audio_to_play = 'cv_audio\\'+self.prev_selected_file
                     self.play_audio = PlayAudio( audio_to_play)
-                    
-                    # self.play_audio.set_filename(audio_to_play)
                     self.play_audio.moveToThread(self.thread1)
+                    self.play_audio.finished.connect(self.change_pause_start_dis)
                     self.play_audio.finished.connect(self.thread1.quit)
                     self.start_audio()
-                    
-                    # filename = self.cv_listview.selectedIndexes()[0].data()
-                    # audio_to_play = 'cv_audio\\'+filename
-                    # self.play_audio.set_filename(audio_to_play)
-                    # self.play_audio.moveToThread(self.thread1)
-                    # self.play_audio.finished.connect(self.del_play_audio)
-                    # self.play_audio.finished.connect(self.thread1.quit)
-                    # self.start_audio()
-
-                    # if self.cv_listview.selectedIndexes():
-                    #     filename = self.cv_listview.selectedIndexes()[0].data()
-                    #     audio_to_play = 'cv_audio\\' + filename
-                    #     self.play_audio.set_filename(audio_to_play)
-                    #     self.play_audio.moveToThread(self.thread1)
-                    #     # self.play_audio.finished.connect(self.del_play_audio)
-                    #     self.play_audio.finished.connect(self.thread1.quit)
-                    #     self.start_audio()
-                    # else:
-                    #     print('No selected index')
-
                 else:
                     pass
-                # print(filename)
             except Exception as e:
                 print(e)
+            self.change_pause_start_dis()
+
+    def change_pause_start_dis(self):
+        if self.isPauseDisplay:
+            self.Pause_Start_B.setIcon(QIcon("Raw_Image/Play_bttn.png"))
+        else:
             self.Pause_Start_B.setIcon(QIcon("Raw_Image/Pause_bttn.png"))
         self.isPauseDisplay = not self.isPauseDisplay
+    
     
     def start_audio(self):
         self.thread1.started.connect(self.play_audio.play)
         self.thread1.start()
 
-    def play_sel_audio(self, filepath):
-        self.audio_analyzer.play_audio_background(filepath)
-
-    # def stop_btn_clicked(self):
-    #     try:
-    #         self.play_audio.disconnect()
-    #         self.play_audio.stop()
-    #         print('play_audio is deleted')
-           
-    #     except:
-    #         pass
-    #     # print('HEyyy')
-    #     # raise SystemExit()
-    #     pass
-    #     # self.audio_analyzer.stop_audio()
-
     def stop_btn_clicked(self):
         try:
-            # Disconnect signals and stop audio playback
-            # self.play_audio.started.disconnect()
-            # self.play_audio.finished.disconnect()
-            # self.play_audio.moveToThread(self.thread1)
             self.play_audio.stop()
             self.play_audio.disconnect()
-            
-            
             # self.play_audio.deleteLater()
             print('play_audio stopped')
         except Exception as e:
             print(e)
-            
-    def del_thread1(self):
-        # self.thread1.deleteLater()
-        pass
-
-    def del_play_audio(self):
-        # self.play_audio = PlayAudio('')
-        print('Deleted1')
         
 if __name__ == "__main__":
     app = QApplication(sys.argv)

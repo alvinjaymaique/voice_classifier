@@ -156,7 +156,7 @@ class VoiceClassifier:
             self.audio.terminate()
             self.save_to_file()
 
-    def record_audio(self, output_file, duration=5, sample_rate=44100, chunk_size=1024, format=pyaudio.paInt16, channels=1):
+    def record_audio(self, output_file, duration=60, sample_rate=44100, chunk_size=1024, format=pyaudio.paInt16, channels=1):
         # self.loop()
         audio = pyaudio.PyAudio()
         stream = audio.open(format=format, channels=channels, rate=sample_rate, input=True, frames_per_buffer=chunk_size)
