@@ -1,0 +1,2 @@
+Category: Bass, Tenor, Alto, Soprano
+Seconds: 14, 8, 6, 14

@@ -331,15 +331,12 @@ class MainWindow(QMainWindow):
         self.check_dir()
 
     def check_dir(self):
-        # Create cv_audio directory if it does not exist
-        if not os.path.exists('cv_audio'):
-            os.makedirs('cv_audio')
-        if not os.path.exists(self.import_audio_dir):
-            os.makedirs(self.import_audio_dir)
-        if not os.path.exists('recordings'):
-            os.makedirs('recordings')
-        if not os.path.exists('train_audio'):
-            os.makedirs('train_audio')    
+        # Create cv_audio directory if it does not exist   
+        self.create_dir('cv_audio')
+        self.create_dir(self.import_audio_dir)
+        self.create_dir('recordings')
+        self.create_dir('train_audio')
+        self.create_dir('temp')
         categories = ['bass', 'tenor', 'alto', 'soprano']
         for category in categories:
             path = 'train_audio\\'+category
@@ -350,6 +347,9 @@ class MainWindow(QMainWindow):
             if not os.path.exists(path+'\\csv'):
                 os.makedirs(path+'\\csv')
 
+    def create_dir(self, dir):
+         if not os.path.exists(dir):
+            os.makedirs(dir)    
 
     def load_files(self):
         directory = QDir('cv_audio')
@@ -576,6 +576,7 @@ class MainWindow(QMainWindow):
         if not isPractice:
             self.display_record.setHtml(self.displayTextList[0]+'Recording Saved'+self.displayTextList[1])  
         else:
+            self.display_record.setHtml(self.displayTextList[0]+'Calculating the score...'+self.displayTextList[1])  
             pass
         print('Done Recording')
         self.btn_pause_start.setEnabled(True)
@@ -697,7 +698,7 @@ class MainWindow(QMainWindow):
         path = self.tv_selected_item
          # Handle record button clicked event   
         self.btn_practice.setVisible(False)
-        self.cur_path = 'temp\\1'
+        self.cur_path = 'temp\\0'
         index = int(self.index_for_list_sec)
         self.list_seconds = self.read_json(self.path_for_seconds)
         self.seconds = self.list_seconds[index]
