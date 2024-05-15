@@ -805,7 +805,7 @@ p, li { white-space: pre-wrap; }
        <x>280</x>
        <y>400</y>
        <width>181</width>
-       <height>31</height>
+       <height>41</height>
       </rect>
      </property>
      <property name="minimumSize">
@@ -817,7 +817,7 @@ p, li { white-space: pre-wrap; }
      <property name="maximumSize">
       <size>
        <width>181</width>
-       <height>31</height>
+       <height>60</height>
       </size>
      </property>
      <property name="font">

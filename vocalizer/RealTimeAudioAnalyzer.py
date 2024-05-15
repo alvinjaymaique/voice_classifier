@@ -24,6 +24,7 @@ import csv
 import wave
 import pydub.playback
 import ctypes
+from fastdtw import fastdtw
 from pydub.playback import play
 
 class RealTimeAudioAnalyzer:
@@ -157,7 +158,7 @@ class RealTimeAudioAnalyzer:
             #         break  # Exit the loop if the flag is set
             #     # Extract the current chunk
             #     chunk = audio[start_time:start_time + chunk_duration]
-            #     # Play the chunk
+                # Play the chunk
             #     play(chunk)
         # play_audio_task()
         self.audio_thread = threading.Thread(target=play_audio_task)
@@ -165,6 +166,16 @@ class RealTimeAudioAnalyzer:
         self.audio_thread.start()
         # split_file = audio_file.split('.')
         # self.start_record(split_file[0]+'1'+split_file[1])
+
+    def get_audio_duration(self, file_path):
+        with wave.open(file_path, 'rb') as audio_file:
+            # Get the number of frames
+            num_frames = audio_file.getnframes()
+            # Get the frame rate (number of frames per second)
+            frame_rate = audio_file.getframerate()
+            # Calculate duration (in seconds)
+            duration = num_frames / float(frame_rate)
+        return duration
 
     def stop_audio(self):
         # Check if there is a player object and stop it
@@ -200,7 +211,7 @@ class RealTimeAudioAnalyzer:
 
     def saveto_csv(self, filename):
         # Load the audio file
-        audio_file = filename
+        audio_file = filename.split('.')[0]+'.wav'
         y, sr = librosa.load(audio_file)
         # Extract fundamental frequency
         f0, voiced_flag, voiced_probs = librosa.pyin(y, fmin=librosa.note_to_hz('C2'), fmax=librosa.note_to_hz('C7'))
@@ -236,6 +247,7 @@ class RealTimeAudioAnalyzer:
 
     def read_csv(self, csv_file):
         # Initialize an empty list to store musical notes
+        csv_file = csv_file.split('.')[0]+'.csv'
         read_musical_notes = []
         # Open the CSV file in read mode with UTF-8 encoding
         with open(csv_file, 'r', encoding='utf-8') as file:
@@ -247,10 +259,43 @@ class RealTimeAudioAnalyzer:
             # Read each row and extract musical notes
             for row in reader:
                 read_musical_notes.append(row[0])
-        # Display the read musical notes
-        print(read_musical_notes)
+        # # Display the read musical notes
+        # print(read_musical_notes)
+        return read_musical_notes
 
-    def score(recorded, reference):
+    # Convert musical notes to numerical representations
+    def notes_to_numbers(self, notes):
+        # Mapping of musical notes to MIDI note numbers, including sharps
+        note_mapping = {
+            'C': 60, 'C♯': 61, 'Db': 61,
+            'D': 62, 'D♯': 63, 'Eb': 63,
+            'E': 64,
+            'F': 65, 'F♯': 66, 'Gb': 66,
+            'G': 67, 'G♯': 68, 'Ab': 68,
+            'A': 69, 'A♯': 70, 'Bb': 70,
+            'B': 71
+        }
+        return [note_mapping[note] for note in notes]
+        # return [librosa.note_to_midi(note, round_midi=True) for note in notes]
+
+        # Compute DTW distance and score
+    def score_dtw(self, recorded, reference):
+        # Convert notes to numerical representations
+        recorded_numbers = self.notes_to_numbers(recorded)
+        reference_numbers = self.notes_to_numbers(reference)
+        # Perform DTW computation
+        distance, _ = fastdtw(recorded_numbers, reference_numbers)
+        distance /= 10 # Just adjust this for error
+        # print(distance)
+        score = (1-(distance/len(reference_numbers)))*100
+        if score > 100:
+            score = 100
+        else:
+            score = score
+        # print((1-(distance/len(reference_numbers)))*100)
+        return score
+
+    def score(self, recorded, reference):
         dictMap = {}
         score = 0
         for index, (note_ref, note_rec) in enumerate(zip(reference, recorded)):
@@ -264,4 +309,5 @@ class RealTimeAudioAnalyzer:
         score = (score/len(dictMap.keys))
         return score
     
+
     
