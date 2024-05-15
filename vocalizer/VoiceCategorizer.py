@@ -19,7 +19,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 class VoiceClassifier:
     # @tf.function(reduce_retracing=True)
-    def __init__(self, data_dir='dataset', test_size=0.2, desired_shape=(128, 128), sr=22050, hop_length=512, n_mels=128):
+    def __init__(self, data_dir='dataset', test_size=0.2, desired_shape=(128, 128), sr=22050, hop_length=512, n_mels=128, stop_record=False):
         self.data_dir = data_dir
         self.test_size = test_size
         self.desired_shape = desired_shape
@@ -28,6 +28,7 @@ class VoiceClassifier:
         self.n_mels = n_mels
         self.labels = {}
         self.model = None
+        self.stop_record = stop_record
 
     def create_model(self, input_shape, num_classes):
         model = models.Sequential([
@@ -163,8 +164,11 @@ class VoiceClassifier:
         print("Recording...")
         frames = []
         for i in range(0, int(sample_rate / chunk_size * duration)):
-            data = stream.read(chunk_size)
-            frames.append(data)
+            if not self.stop_record:
+                data = stream.read(chunk_size)
+                frames.append(data)
+            else:
+                break
         print("Recording finished.")
         stream.stop_stream()
         stream.close()
@@ -176,6 +180,9 @@ class VoiceClassifier:
         wave_file.writeframes(b''.join(frames))
         wave_file.close()
         print(f"Audio saved to {output_file}")
+
+    def recording_stop(self):
+        self.stop_record = True
 
     def loop(self):
         for i in range(3,0,-1):

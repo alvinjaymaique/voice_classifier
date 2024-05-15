@@ -1,4 +1,4 @@
-import sys, os, shutil, time, ctypes, threading, json
+import sys, os, shutil, time, ctypes, threading, json, wave
 from PyQt5.QtWidgets import QApplication, QMainWindow, QFileDialog, QToolButton, QPushButton, QDialog, QMessageBox, QTextEdit, QListView, QVBoxLayout, QWidget
 from PyQt5.QtGui import QIcon
 from PyQt5.uic import loadUi
@@ -10,8 +10,10 @@ from VoiceCategorizer import VoiceClassifier
 from RealTimeAudioAnalyzer import RealTimeAudioAnalyzer
 from InputFilename import InputFilename_Dialog
 from input_gender import Ui_input_gender_form
+import numpy as np
 
-# I can only play an audio once, fix this next time
+# Checkpoint: Make the user train their voice make it record while following the vocal exercise audio
+# Plan on how to record it dynamically based on the audio length. I just got an idea I just have to emit a signal when the audio is finished then I will end the recording
 
 class Ctgrz_Optn_Dialog(QDialog, Ui_Dialog):
     def __init__(self, parent=None):
@@ -45,23 +47,25 @@ class Counter(QObject):
     finished = pyqtSignal()
     progress = pyqtSignal(int)
     start_record = pyqtSignal()
+    play_background = pyqtSignal()
 
-    def __init__(self, function, seconds=3):
+    def __init__(self, function, seconds=3, duration=61):
         super().__init__()
         self.function = function
         self.seconds = seconds
+        self.duration = duration
         self.destroyed.connect(self.function) # When the instance of this class is destroyed it will call this function
 
     def count_down(self):
+        self.play_background.emit()
         for i in range(self.seconds, 0, -1):
             self.progress.emit(i) # Emit progress
             QThread.sleep(1)
         self.start_record.emit()
-        QThread.sleep(61)
+        QThread.sleep(self.duration-self.seconds)
         self.finished.emit() # Signal task completion
 
 class PlayAudio(QObject):
-    
     started = pyqtSignal()
     progress = pyqtSignal()
     finished = pyqtSignal()
@@ -124,22 +128,74 @@ class PlayAudio(QObject):
     def stop(self):
         print('Stopped')
         self.finished.emit()
-        self.is_stop = True       
+        self.is_stop = True   
 
+from PyQt5.QtCore import QThread, pyqtSignal
 
-# class QListView(QListView):
-#     def focusOutEvent(self, event):
-#         # Call the base class method to ensure the default behavior is executed
-#         super().focusOutEvent(event)
-        
-#         # Your custom handling code here
-#         print("ListView lost focus")
+class RecordThread(QThread):
+    finished = pyqtSignal()
+
+    def __init__(self, voice_classifier, cur_path, duration):
+        super().__init__()
+        self.voice_classifier = voice_classifier
+        self.cur_path = cur_path
+        self.duration = duration
+
+    def run(self):
+        self.voice_classifier.record_audio(self.cur_path, self.duration)
+        # for _ in range(int(self.duration), 0, -1):
+        #     QThread.sleep(1)
+        print('Record Finished')
+        self.finished.emit()
+
+    def stop(self):
+        self.voice_classifier.stop_recording()
+        self.voice_classifier.stop_record = True
+
+class PlayBackgroundThread(QThread):
+    finished = pyqtSignal()
+
+    def __init__(self, audio_analyzer, cur_path):
+        super().__init__()
+        self.audio_analyzer = audio_analyzer
+        self.cur_path = cur_path
+
+    def run(self):
+        self.audio_analyzer.play_audio_background(self.cur_path)
+        self.finished.emit()
+
+class ScoreThread(QThread):
+    calculating = pyqtSignal(str)
+    finished = pyqtSignal(str)  # Define a signal to emit the result
+
+    def __init__(self, audio_analyzer, cur_path, dir_current_csv):
+        super().__init__()
+        self.audio_analyzer = audio_analyzer
+        self.cur_path = cur_path
+        self.dir_current_csv = dir_current_csv
+
+    def run(self):
+        cur_path = self.cur_path.split('.')[0]
+        self.audio_analyzer.saveto_csv(cur_path)
+        # result = self.audio_analyzer.read_csv(cur_path)   
+        self.calculating.emit('Score Calculating...')
+        score = self.audio_analyzer.score_dtw(self.audio_analyzer.read_csv(cur_path), self.audio_analyzer.read_csv(self.dir_current_csv))
+        message = 'Your score is: '+ str(f"{score:.2f}") 
+        print(message)
+        self.finished.emit(message)  # Emit the result when finished
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         loadUi("Vocalizer.ui", self)
 
+        # Voice Classifier
+        self.voice_classifier = VoiceClassifier()
+        self.voice_classifier.load_model('model.keras', 'labels.json')
+
+        # Real Time Audio Analyzer
+        self.audio_analyzer = RealTimeAudioAnalyzer() 
+        
         # Variables
         self.isPauseDisplay = True
         self.isDialogOpen = False
@@ -159,6 +215,12 @@ class MainWindow(QMainWindow):
         # list of seconds for vocal warmups
         self.list_seconds = []
         self.path_for_seconds = ''
+        self.seconds = None
+
+        self.dir_current_csv = None
+        self.thread4 = None
+        # self.record_thread_tv = None
+        # self.record_thread_tv = RecordThread(self.voice_classifier, self.cur_path, duration=120)
 
 
         # # QMain bar setup
@@ -197,7 +259,6 @@ class MainWindow(QMainWindow):
         self.Bass_List_2.hide()
         self.Alto_List_2.hide()
         #
-
 
         # Connect button toggled signal to adjust button positions
         self.Tenor_Bttn.toggled.connect(self.adjust_button_positions)
@@ -250,7 +311,6 @@ class MainWindow(QMainWindow):
         <p align="center" style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"><span style=" font-size:14pt;">''',
         '''</span></p></body></html>''']
         # self.display_record.setMarkdown(self.displayTextList[0]+'Test'+self.displayTextList[1])
-        
 
         # Load files from cv_audio
         self.load_files()
@@ -267,16 +327,8 @@ class MainWindow(QMainWindow):
         w = self.ctgrz_optn_dialog.width()
         self.ctgrz_optn_dialog.setGeometry(x, y, h, w)
 
-        # Voice Classifier
-        self.voice_classifier = VoiceClassifier()
-        self.voice_classifier.load_model('model.keras', 'labels.json')
-
-        # Real Time Audio Analyzer
-        self.audio_analyzer = RealTimeAudioAnalyzer()
-        
         # Check directories if it exists
         self.check_dir()
-        
 
     def check_dir(self):
         # Create cv_audio directory if it does not exist
@@ -335,6 +387,7 @@ class MainWindow(QMainWindow):
                 if selected_item.startswith(directory):
                     self.index_for_list_sec = selected_item[len(directory):].split('.')[0]  # Remove the prefix string1 from string2
                     print(self.index_for_list_sec)
+                    self.dir_current_csv = 'train_audio\\'+directory+'\\csv\\'+directory+self.index_for_list_sec
                 print(directory)
         
         # self.alto_list.selectedIndexes()[0].data()
@@ -505,15 +558,25 @@ class MainWindow(QMainWindow):
             self.record_thread.setDaemon = True
             self.record_thread.start()
         else:
+            duration = np.round(self.audio_analyzer.get_audio_duration(self.tv_selected_item)) - self.seconds + 1
+            # duration = np.round(self.get_audio_duration(self.tv_selected_item)) - self.seconds + 1
+            print('Duration: ',duration)
+            self.thread2 = QThread()
+            self.record_thread_tv = RecordThread(self.voice_classifier, self.cur_path, duration=duration)
+            self.record_thread_tv.moveToThread(self.thread2)
+            # self.record_thread_tv.deleteLater()
+            print('Current_path: '+self.cur_path)
+            self.record_thread_tv.finished.connect(lambda: self.get_score(self.cur_path))
+            self.record_thread_tv.finished.connect(self.thread2.quit)
+            self.thread2.started.connect(self.record_thread_tv.run)
+            self.thread2.start()
             print('isCV is False')
+
+    def done_recording(self, isPractice=False):
+        if not isPractice:
+            self.display_record.setHtml(self.displayTextList[0]+'Recording Saved'+self.displayTextList[1])  
+        else:
             pass
-
-    # def record_tv(self):
-    #     pass
-
-
-    def done_recording(self):
-        self.display_record.setHtml(self.displayTextList[0]+'Recording Saved'+self.displayTextList[1])  
         print('Done Recording')
         self.btn_pause_start.setEnabled(True)
         self.btn_stop.setEnabled(True)
@@ -594,7 +657,9 @@ class MainWindow(QMainWindow):
                     audio_to_play = 'cv_audio\\'+self.prev_selected_file
                     self.play_audio = PlayAudio( audio_to_play)
                     self.play_audio.moveToThread(self.thread1)
+                    self.play_audio.started.connect(lambda: self.display_label('Playing...'))
                     self.play_audio.finished.connect(self.change_pause_start_dis)
+                    self.play_audio.finished.connect(lambda: self.display_label('Vocalizer'))
                     self.play_audio.finished.connect(self.thread1.quit)
                     self.start_audio()
                 else:
@@ -602,6 +667,9 @@ class MainWindow(QMainWindow):
             except Exception as e:
                 print(e)
             self.change_pause_start_dis()
+
+    def display_label(self, string):
+        self.display_record.setHtml(self.displayTextList[0]+string+self.displayTextList[1])
 
     def change_pause_start_dis(self):
         if self.isPauseDisplay:
@@ -626,26 +694,64 @@ class MainWindow(QMainWindow):
 
     def practice_clicked(self):
         print('Start Practice')
+        path = self.tv_selected_item
          # Handle record button clicked event   
         self.btn_practice.setVisible(False)
         self.cur_path = 'temp\\1'
         index = int(self.index_for_list_sec)
         self.list_seconds = self.read_json(self.path_for_seconds)
-        seconds = self.list_seconds[index]
+        self.seconds = self.list_seconds[index]
         # Define Counter
+        self.btn_pause_start.setEnabled(False)
+        self.btn_stop.setEnabled(False)
         self.thread = QThread()
-        self.counter = Counter(self.save_recorded, seconds=seconds)
+        self.counter = Counter(self.save_recorded, seconds=self.seconds)
         self.counter.moveToThread(self.thread)
         self.counter.finished.connect(self.thread.quit)
         self.counter.progress.connect(self.counting)
         self.counter.start_record.connect(self.done_counting) 
-        self.counter.start_record.connect(lambda: self.record_cv(isCV=False))
+        self.counter.start_record.connect(lambda: self.record_cv(isCV=False)) 
+        self.counter.play_background.connect(lambda: self.play_vocal_exercise(path=path))
         self.counter.finished.connect(self.done_counting) 
-        self.counter.finished.connect(self.done_recording)
-        # self.counter.deleteLater()
+        self.counter.finished.connect(lambda: self.done_recording(isPractice=True))
+        self.counter.deleteLater()
         self.start_task()
-        path = self.tv_selected_item
-        self.audio_analyzer.play_audio_background(path)
+
+    def play_vocal_exercise(self, path):
+        self.thread3 = QThread()
+        self.play_vocal = PlayBackgroundThread(self.audio_analyzer, path)
+        self.play_vocal.moveToThread(self.thread3)
+        self.play_vocal.finished.connect(self.thread3.quit)
+        # self.play_vocal.finished.connect(self.tv_stop_recording)
+        self.play_vocal.deleteLater()
+        self.play_vocal.started.connect(self.play_vocal.run)
+        # print(self.cur_path)
+        # self.play_vocal.finished.connect(lambda: self.get_score(self.cur_path))
+        self.play_vocal.run()
+        # self.audio_analyzer.play_audio_background(path)
+
+    def get_score(self, cur_path):
+        if self.thread4 is not None:
+            if self.thread4.isRunning():
+                self.thread4.terminate()
+        # Create a thread instance
+        self.thread4 = QThread()
+        self.score_thread = ScoreThread(self.audio_analyzer, cur_path, self.dir_current_csv)
+        # Connect the thread's finished signal to a slot
+        self.score_thread.calculating.connect(self.display_label)
+        self.score_thread.moveToThread(self.thread4)
+        self.score_thread.finished.connect(self.thread4.quit)
+        self.score_thread.finished.connect(self.display_label)
+
+        self.score_thread.start()
+
+    def tv_stop_recording(self):
+        if self.record_thread_tv is not None:
+            self.record_thread_tv.stop()
+            print('Stopped')
+        else: 
+            print('record_thread_tv is None')
+        # self.record_thread_tv = True
 
     def write_json(self, data, filepath):
         with open(filepath, 'w') as f:
