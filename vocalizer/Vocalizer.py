@@ -1,15 +1,16 @@
 import sys, os, shutil, time, ctypes, threading, json, wave
-from PyQt5.QtWidgets import QApplication, QMainWindow, QFileDialog, QToolButton, QPushButton, QDialog, QMessageBox, QTextEdit, QListView, QVBoxLayout, QWidget
+from PyQt5.QtWidgets import QApplication, QMainWindow, QFileDialog, QToolButton, QPushButton, QDialog, QMessageBox, QTextEdit, QListView, QVBoxLayout, QWidget, QLayout
 from PyQt5.QtGui import QIcon
 from PyQt5.uic import loadUi
 from PyQt5 import QtCore, QtWidgets
-from PyQt5.QtCore import QStringListModel, QFileInfo, QDir, QTimer, QItemSelectionModel, QItemSelection, QObject, pyqtSignal, QThread
+from PyQt5.QtCore import QStringListModel, QDir, QObject, pyqtSignal, QThread
 from resources_rc import *
 from Ctgrz_Optn import Ui_Dialog  # Import the QDialog UI form from Ctgrz_Optn.py
 from VoiceCategorizer import VoiceClassifier
 from RealTimeAudioAnalyzer import RealTimeAudioAnalyzer
 from InputFilename import InputFilename_Dialog
 from input_gender import Ui_input_gender_form
+from pydub import AudioSegment
 import numpy as np
 
 # Checkpoint: Make the user train their voice make it record while following the vocal exercise audio
@@ -219,6 +220,7 @@ class MainWindow(QMainWindow):
 
         self.dir_current_csv = None
         self.thread4 = None
+
         # self.record_thread_tv = None
         # self.record_thread_tv = RecordThread(self.voice_classifier, self.cur_path, duration=120)
 
@@ -272,9 +274,13 @@ class MainWindow(QMainWindow):
         self.cv_btn.clicked.connect(self.adjust_button_positions)
         self.cv_btn.clicked.connect(self.clear_list_clicked)
 
-        self.tv_btn = self.findChild(QPushButton, 'TV_Button')
-        self.tv_btn.clicked.connect(self.adjust_button_positions)
-        self.tv_btn.clicked.connect(self.clear_list_clicked)
+        # Delete button for categorize button
+        self.btn_del = self.findChild(QPushButton, 'btn_del')
+        self.btn_del.clicked.connect(self.del_predicted_audio)
+
+        # self.tv_btn = self.findChild(QPushButton, 'TV_Button')
+        # self.tv_btn.clicked.connect(self.adjust_button_positions)
+        # self.tv_btn.clicked.connect(self.clear_list_clicked)
 
         # Setup vertical layout
         self.v_layout = self.findChild(QVBoxLayout, 'verticalLayout')
@@ -288,8 +294,7 @@ class MainWindow(QMainWindow):
         # Instantiate cv list view
         self.cv_listview = self.findChild(QListView, 'CV_List')
         self.cv_listview.selectionModel().selectionChanged.connect(self.onclick_listview)  # Connect selectionChanged signal
-        
-
+   
         # Set up displayRecord QTextEdit
         self.display_record = self.findChild(QTextEdit, 'display_record')
         # self.display_record.setHtml('Test')
@@ -438,7 +443,7 @@ class MainWindow(QMainWindow):
         # file_dialog = QFileDialog(self.parent())
         file_dialog = QFileDialog()
         file_dialog.setModal(True)  # Ensure the dialog is modal
-        file_dialog.setNameFilter("Music files (*.mp3 *.wav *.ogg)")
+        file_dialog.setNameFilter("Music files (*.mp3 *.wav)") # *.ogg
         file_dialog.setDefaultSuffix("wav")
         file_dialog.setFileMode(QFileDialog.ExistingFile)
         file_dialog.setViewMode(QFileDialog.List)
@@ -453,9 +458,15 @@ class MainWindow(QMainWindow):
             file_path = file_dialog.selectedFiles()[0]
             print(file_path)
             # print(f"Selected {button_type} file:", file_path)
-            file_name = os.path.basename(file_path)
-            print(file_name)
             
+            # If file is an mp3 then it will convert to wav file
+            if file_path.split('.')[1] == 'mp3':
+                destination = file_path.split('.')[0]+'.wav'
+                self.convert_mp3_to_wav(file_path, destination)
+                file_path = destination
+
+            file_name = os.path.basename(file_path)
+            print('This is the file: ',file_name)
             # Copy file
             shutil.copy(file_path, os.curdir)
             gender = self.create_gender_dialog() # 0=Male 1=Female
@@ -470,9 +481,20 @@ class MainWindow(QMainWindow):
             else:
                 QMessageBox.critical(self, 'Error', f'The {file_name} file already exists')
             os.remove(file_name)
+            os.remove(file_path)
+
+    def convert_mp3_to_wav(self, mp3_file, destination):
+        # Load MP3 file
+        audio = AudioSegment.from_mp3(mp3_file)
+        # Export as WAV
+        audio.export(destination, format="wav")
 
     def cv_add_list(self, path):
         self.cv_files.append(path)
+        self.cv_model.setStringList(self.cv_files)
+
+    def cv_remove_list(self, path):
+        self.cv_files.remove(path)
         self.cv_model.setStringList(self.cv_files)
 
     def predict_audio(self, filename, gender):
@@ -595,7 +617,6 @@ class MainWindow(QMainWindow):
             self.update_cv_list(new_name)
         except Exception as e:
             print('No such file or directory Error')
-
         
     def update_cv_list(self, file_path):
         print(f"Selected CV file: {file_path}")
@@ -613,7 +634,6 @@ class MainWindow(QMainWindow):
         buttons = self.SideBar.findChildren(QPushButton)
         # Calculate the center position of the SideBar widget
         sidebar_center = self.SideBar.rect().center()
-
         for button in buttons:
             # Adjust the button position to be centered horizontally within the SideBar
             button_rect = button.rect()
@@ -621,10 +641,26 @@ class MainWindow(QMainWindow):
             button.move(sidebar_center.x() - button_center.x(), button.y())  # Adjust vertical position
 
     def onclick_listview(self):
+        if self.play_audio.is_stop:
+            self.btn_del.setEnabled(True)  
         self.isPauseDisplay = False
         self.btn_practice.setEnabled(False)
         self.btn_practice.setVisible(False)
         self.btn_pause_start.setIcon(QIcon("Raw_Image/Play_bttn.png"))
+
+    def del_predicted_audio(self):
+        cur_filename = self.cv_listview.selectedIndexes()[0].data()
+        print(cur_filename)
+        cv_path = 'cv_audio\\'+cur_filename
+        if os.path.exists(cv_path):
+            # print('Before removing: ',self.cv_files)
+            os.remove(cv_path)
+            QMessageBox.information(self, 'Success', 'File has been removed')
+            self.cv_remove_list(cur_filename)
+            # print('After removing: ',self.cv_files)
+        else:
+            QMessageBox.critical(self, 'Error', 'File Does Not Exist!')
+        
 
     def pause_start_action(self):
         # Toggle between Pause and Play icons
@@ -654,7 +690,7 @@ class MainWindow(QMainWindow):
 
                     self.prev_selected_file = cur_filename
                     print(self.prev_selected_file)
-
+                    self.btn_del.setEnabled(False)
                     # Define new thread and self.play_audio worker
                     self.thread1 = QThread()
                     audio_to_play = 'cv_audio\\'+self.prev_selected_file
@@ -665,6 +701,8 @@ class MainWindow(QMainWindow):
                     self.play_audio.finished.connect(lambda: self.display_label('Vocalizer'))
                     self.play_audio.finished.connect(self.thread1.quit)
                     self.start_audio()
+                    self.play_audio.is_stop
+                    print('Is audio stop? ', self.play_audio.is_stop)
                 else:
                     pass
             except Exception as e:
@@ -691,7 +729,9 @@ class MainWindow(QMainWindow):
             self.play_audio.stop()
             self.play_audio.disconnect()
             # self.play_audio.deleteLater()
+            self.btn_del.setEnabled(True)
             print('play_audio stopped')
+            print('Is audio stop? ', self.play_audio.is_stop)
         except Exception as e:
             print(e)
 
