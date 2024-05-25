@@ -478,6 +478,7 @@ class MainWindow(QMainWindow):
     def predict_audio(self, filename, gender):
         # 0=male 1=female
         category = self.voice_classifier.predict_audio(filename)
+        print('This is the category: ', category)
         # Increase accuracy since dataset is few
         if gender==0 and (category=='alto' or category=='soprano'):
             category = 'tenor'
@@ -498,7 +499,8 @@ class MainWindow(QMainWindow):
 
         result_ex = self.input_filename.exec_()
         if result_ex:
-            pass
+            self.btn_practice.setVisible(False)
+            self.btn_practice.setEnabled(False)
             # Define Counter
             self.thread = QThread()
             self.counter = Counter(self.save_recorded)

@@ -79,7 +79,7 @@ QLabel{
         <property name="topMargin">
          <number>9</number>
         </property>
-        <item>
+        <item alignment="Qt::AlignHCenter">
          <widget class="QPushButton" name="CV_Button">
           <property name="minimumSize">
            <size>
@@ -163,6 +163,9 @@ QPushButton:checked{
 	background-color: rgb(255, 255, 255);
 }</string>
           </property>
+          <property name="editTriggers">
+           <set>QAbstractItemView::NoEditTriggers</set>
+          </property>
          </widget>
         </item>
        </layout>
@@ -185,7 +188,7 @@ QPushButton:checked{
       </item>
       <item>
        <layout class="QVBoxLayout" name="verticalLayout_2">
-        <item>
+        <item alignment="Qt::AlignHCenter">
          <widget class="QPushButton" name="TV_Button">
           <property name="enabled">
            <bool>true</bool>
@@ -243,7 +246,7 @@ QPushButton:checked{
           </property>
          </widget>
         </item>
-        <item>
+        <item alignment="Qt::AlignHCenter">
          <widget class="QPushButton" name="Tenor_Bttn">
           <property name="minimumSize">
            <size>
@@ -321,7 +324,7 @@ QPushButton:checked{
           </property>
          </widget>
         </item>
-        <item>
+        <item alignment="Qt::AlignHCenter">
          <widget class="QPushButton" name="Soprano_Bttn">
           <property name="minimumSize">
            <size>
@@ -393,7 +396,7 @@ QPushButton:checked{
           </property>
          </widget>
         </item>
-        <item>
+        <item alignment="Qt::AlignHCenter">
          <widget class="QPushButton" name="Bass_Bttn">
           <property name="minimumSize">
            <size>
@@ -471,7 +474,7 @@ QPushButton:checked{
           </property>
          </widget>
         </item>
-        <item>
+        <item alignment="Qt::AlignHCenter">
          <widget class="QPushButton" name="Alto_Bttn">
           <property name="minimumSize">
            <size>
