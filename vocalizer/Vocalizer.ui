@@ -23,7 +23,7 @@
    </size>
   </property>
   <property name="windowTitle">
-   <string>MainWindow</string>
+   <string>Vocalizer</string>
   </property>
   <property name="styleSheet">
    <string notr="true">background-color: rgb(195, 195, 195);

@@ -206,7 +206,7 @@ class MainWindow(QMainWindow):
         self.isAudioRunning = False
         self.cur_path = ''
         self.import_audio_dir = 'recordings'
-        self.play_audio = None  # Initialize play_audio attribute
+        # self.play_audio = None  # Initialize play_audio attribute
         self.thread1 = QThread()  # Create the QThread object once
         self.play_audio = PlayAudio('')
         self.prev_selected_file = ''
@@ -220,6 +220,8 @@ class MainWindow(QMainWindow):
 
         self.dir_current_csv = None
         self.thread4 = None
+
+        self.played_audio = False
 
         # self.record_thread_tv = None
         # self.record_thread_tv = RecordThread(self.voice_classifier, self.cur_path, duration=120)
@@ -641,7 +643,7 @@ class MainWindow(QMainWindow):
             button.move(sidebar_center.x() - button_center.x(), button.y())  # Adjust vertical position
 
     def onclick_listview(self):
-        if self.play_audio.is_stop:
+        if self.play_audio.is_stop or not self.played_audio:
             self.btn_del.setEnabled(True)  
         self.isPauseDisplay = False
         self.btn_practice.setEnabled(False)
@@ -660,6 +662,13 @@ class MainWindow(QMainWindow):
             # print('After removing: ',self.cv_files)
         else:
             QMessageBox.critical(self, 'Error', 'File Does Not Exist!')
+
+        # Remove the audio in recordings if there is one
+        cur_filename = cur_filename.split('-')[0]+'.wav'
+        record_path = 'recordings\\'+cur_filename
+        if os.path.exists(record_path):
+            
+            os.remove(record_path)
         
 
     def pause_start_action(self):
@@ -702,6 +711,7 @@ class MainWindow(QMainWindow):
                     self.play_audio.finished.connect(self.thread1.quit)
                     self.start_audio()
                     self.play_audio.is_stop
+                    self.played_audio = True
                     print('Is audio stop? ', self.play_audio.is_stop)
                 else:
                     pass
