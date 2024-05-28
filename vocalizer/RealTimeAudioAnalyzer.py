@@ -285,7 +285,7 @@ class RealTimeAudioAnalyzer:
         reference_numbers = self.notes_to_numbers(reference)
         # Perform DTW computation
         distance, _ = fastdtw(recorded_numbers, reference_numbers)
-        distance /= 10 # Just adjust this for error
+        distance /= 8 # Just adjust this for error
         # print(distance)
         score = (1-(distance/len(reference_numbers)))*100
         if score > 100:

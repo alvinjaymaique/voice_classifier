@@ -398,6 +398,7 @@ class MainWindow(QMainWindow):
                 print(directory)
         
         # self.alto_list.selectedIndexes()[0].data()
+        self.path_duration = 'train_audio\\'+self.tv_selected_dir+'\\duration.json'
         self.path_for_seconds = 'train_audio\\'+self.tv_selected_dir+'\\seconds.json'
         self.tv_selected_item = 'train_audio\\'+self.tv_selected_dir+'\\audio\\'+selected_item
         if sender == self.alto_list:
@@ -672,6 +673,11 @@ class MainWindow(QMainWindow):
         
 
     def pause_start_action(self):
+        # Close record and import dialog
+        if self.isDialogOpen:
+            self.ctgrz_optn_dialog.close()
+            self.isDialogOpen = False
+
         # Toggle between Pause and Play icons
         if self.isPauseDisplay:
             print("Set to Play Button")
@@ -713,6 +719,7 @@ class MainWindow(QMainWindow):
                     self.play_audio.is_stop
                     self.played_audio = True
                     print('Is audio stop? ', self.play_audio.is_stop)
+                    self.cv_btn.setEnabled(False)
                 else:
                     pass
             except Exception as e:
@@ -740,25 +747,36 @@ class MainWindow(QMainWindow):
             self.play_audio.disconnect()
             # self.play_audio.deleteLater()
             self.btn_del.setEnabled(True)
+            self.cv_btn.setEnabled(True)
             print('play_audio stopped')
             print('Is audio stop? ', self.play_audio.is_stop)
         except Exception as e:
             print(e)
 
     def practice_clicked(self):
+        if not self.play_audio.is_stop:
+            try:
+                self.play_audio.stop()
+                self.play_audio.disconnect()
+            except Exception as e:
+                print(e)
+
         print('Start Practice')
         path = self.tv_selected_item
-         # Handle record button clicked event   
+        # Turn on the Categorize button
+        self.cv_btn.setEnabled(True)
+        # Handle record button clicked event   
         self.btn_practice.setVisible(False)
         self.cur_path = 'temp\\0'
         index = int(self.index_for_list_sec)
         self.list_seconds = self.read_json(self.path_for_seconds)
         self.seconds = self.list_seconds[index]
+        self.duration = self.read_json(self.path_duration)[index]
         # Define Counter
         self.btn_pause_start.setEnabled(False)
         self.btn_stop.setEnabled(False)
         self.thread = QThread()
-        self.counter = Counter(self.save_recorded, seconds=self.seconds)
+        self.counter = Counter(self.save_recorded, seconds=self.seconds, duration=self.duration)
         self.counter.moveToThread(self.thread)
         self.counter.finished.connect(self.thread.quit)
         self.counter.progress.connect(self.counting)
